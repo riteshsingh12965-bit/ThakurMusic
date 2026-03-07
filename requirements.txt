@@ -1,0 +1,43 @@
+# -----------------------------------------------
+# 🔸 ShashankMusic Project
+# 🔹 Developed & Maintained by: Shashank Shukla (https://github.com/itzshukla)
+# 📅 Copyright © 2025 – All Rights Reserved
+#
+# 📖 License:
+# This source code is open for educational and non-commercial use ONLY.
+# You are required to retain this credit in all copies or substantial portions of this file.
+# Commercial use, redistribution, or removal of this notice is strictly prohibited
+# without prior written permission from the author.
+#
+# ❤️ Made with dedication and love by ItzShukla
+# -----------------------------------------------
+
+aiofiles
+aiohttp
+asyncio
+beautifulsoup4
+dnspython
+ffmpeg-python
+gitpython
+hachoir
+heroku3
+httpx==0.27.2
+motor
+numpy
+pillow==9.5.0
+psutil
+py-tgcalls==0.9.7
+pykeyboard
+pyrofork
+python-dotenv
+pyyaml
+requests
+speedtest-cli
+spotipy
+tgcrypto
+unidecode
+yt-dlp
+youtube-search
+youtube-search-python
+wget
+git+https://github.com/yt-dlp/yt-dlp
