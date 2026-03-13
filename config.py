@@ -58,7 +58,7 @@ GIT_TOKEN = getenv("GIT_TOKEN", "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")  # O
 
 # ✅ Support Links
 SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/BOTxBOOSTER")
-SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/BOTxBOOSTER")
+SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/BotsSupport_36")
 
 # ✅ Auto Features
 AUTO_LEAVING_ASSISTANT = bool(getenv("AUTO_LEAVING_ASSISTANT", False))
