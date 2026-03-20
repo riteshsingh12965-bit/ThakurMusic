@@ -2,7 +2,7 @@ import os
 import aiofiles
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from py_yt import VideosSearch
+from youtubesearchpython.__future__ import VideosSearch
 from config import YOUTUBE_IMG_URL
 from ShrutiMusic import app
 
@@ -12,7 +12,7 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 
 def trim(text, font, max_w):
     try:
-        while font.getbbox(text)[2] > max_w:
+        while font.getbbox(text)[2] > max_w and len(text) > 3:
             text = text[:-1]
         return text + "..."
     except:
@@ -27,9 +27,9 @@ async def gen_thumb(videoid: str, player_username=None):
     if os.path.exists(path):
         return path
 
-    # 🔍 YT FETCH
+    # 🔍 YT FETCH (FIXED)
     try:
-        results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
+        results = VideosSearch(videoid, limit=1)
         res = await results.next()
 
         if not res.get("result"):
@@ -42,7 +42,7 @@ async def gen_thumb(videoid: str, player_username=None):
         duration = data.get("duration", "Live")
         views = data.get("viewCount", {}).get("short", "0")
 
-    except:
+    except Exception:
         title, thumb_url, duration, views = "Unknown", YOUTUBE_IMG_URL, "Live", "0"
 
     thumb_path = f"{CACHE_DIR}/{videoid}.png"
@@ -55,14 +55,13 @@ async def gen_thumb(videoid: str, player_username=None):
                     async with aiofiles.open(thumb_path, "wb") as f:
                         await f.write(await r.read())
                 else:
-                    raise Exception
+                    thumb_path = None
     except:
         thumb_path = None
 
-    # 🖤 BLACK BG
+    # 🖤 BACKGROUND
     bg = Image.new("RGB", (1280, 720), (0, 0, 0))
 
-    # 🔥 PREMIUM GLOW BACKGROUND
     glow = Image.new("RGB", (1280, 720), (0, 0, 0))
     g = ImageDraw.Draw(glow)
     g.ellipse((200, 50, 1100, 750), fill=(255, 120, 40))
@@ -73,7 +72,10 @@ async def gen_thumb(videoid: str, player_username=None):
 
     # 🖼 THUMB
     try:
-        thumb = Image.open(thumb_path).resize((420, 420)).convert("RGBA")
+        if thumb_path:
+            thumb = Image.open(thumb_path).resize((420, 420)).convert("RGBA")
+        else:
+            raise Exception
     except:
         thumb = Image.new("RGBA", (420, 420), (40, 40, 40, 255))
 
@@ -81,24 +83,21 @@ async def gen_thumb(videoid: str, player_username=None):
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, 420, 420), 40, fill=255)
     thumb.putalpha(mask)
 
-    # 🔥 SHADOW (FLOAT)
+    # 🔥 SHADOW
     shadow = Image.new("RGBA", (460, 460), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
     sd.rounded_rectangle((0, 0, 460, 460), 50, fill=(0, 0, 0, 180))
     shadow = shadow.filter(ImageFilter.GaussianBlur(50))
     bg.paste(shadow, (110, 140), shadow)
 
-    # 🔥 BORDER + GLOW
+    # 🔥 BORDER
     border = Image.new("RGBA", (460, 460), (0, 0, 0, 0))
     bd = ImageDraw.Draw(border)
     bd.rounded_rectangle((0, 0, 460, 460), 50, outline=(255, 120, 40), width=5)
 
-    glow1 = border.filter(ImageFilter.GaussianBlur(30))
-    glow2 = border.filter(ImageFilter.GaussianBlur(60))
-
-    bg.paste(glow2, (100, 130), glow2)
-    bg.paste(glow1, (100, 130), glow1)
-    bg.paste(border, (100, 130), border)
+    bg.paste(border.filter(ImageFilter.GaussianBlur(50)), (100, 130))
+    bg.paste(border.filter(ImageFilter.GaussianBlur(25)), (100, 130))
+    bg.paste(border, (100, 130))
     bg.paste(thumb, (120, 150), thumb)
 
     # 🅵🅾🅽🆃
@@ -113,7 +112,7 @@ async def gen_thumb(videoid: str, player_username=None):
     draw.rounded_rectangle((600, 140, 830, 195), 25, fill=(255, 120, 40))
     draw.text((635, 152), "NOW PLAYING", fill="white", font=small_font)
 
-    # 🎵 TITLE (GLOW EFFECT)
+    # 🎵 TITLE
     title = trim(title, title_font, 550)
     draw.text((602, 242), title, fill=(255,120,40), font=title_font)
     draw.text((600, 240), title, fill="white", font=title_font)
@@ -145,9 +144,10 @@ async def gen_thumb(videoid: str, player_username=None):
 
     bg.paste(reflection, (0, 500), reflection)
 
-    # 🔥 BRANDING
+    # 🔥 BRAND
     draw.text((820, 660), "Powered by Mr Thakur", fill=(255, 120, 40), font=small_font)
 
+    # 🧹 CLEAN
     try:
         if thumb_path and os.path.exists(thumb_path):
             os.remove(thumb_path)
