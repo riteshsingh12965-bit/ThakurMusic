@@ -4,7 +4,7 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from youtubesearchpython.__future__ import VideosSearch
 from config import YOUTUBE_IMG_URL
-from ShrutiMusic import app
+from ShashankMusic import app
 
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -27,7 +27,7 @@ async def gen_thumb(videoid: str, player_username=None):
     if os.path.exists(path):
         return path
 
-    # 🔍 YT FETCH (FIXED)
+    # 🔍 FETCH YOUTUBE DATA
     try:
         results = VideosSearch(videoid, limit=1)
         res = await results.next()
@@ -47,7 +47,7 @@ async def gen_thumb(videoid: str, player_username=None):
 
     thumb_path = f"{CACHE_DIR}/{videoid}.png"
 
-    # ⬇ DOWNLOAD
+    # ⬇ DOWNLOAD THUMB
     try:
         async with aiohttp.ClientSession() as s:
             async with s.get(thumb_url) as r:
