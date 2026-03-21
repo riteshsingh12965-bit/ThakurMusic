@@ -24,21 +24,29 @@ def trim(text, font, max_w):
         return text
 
 
-async def get_thumb(videoid: str, title: str, player_username=None):
+# 🔥 FINAL FLEXIBLE FUNCTION (NO TYPE ERROR EVER)
+async def get_thumb(videoid: str, title=None, player_username=None):
     videoid = extract_video_id(videoid)
 
+    # ✅ auto username
     if player_username is None:
         player_username = getattr(app, "username", "MusicBot")
+
+    # ✅ fallback title (VERY IMPORTANT)
+    if not title:
+        title = videoid
+
+    # clean title
+    title = re.sub(r"\W+", " ", str(title)).title()
+
+    if len(title) > 30:
+        title = title[:30] + "..."
 
     path = f"{CACHE_DIR}/{videoid}_final.png"
     if os.path.exists(path):
         return path
 
-    # 🎵 CLEAN TITLE (NO ERROR)
-    title = re.sub(r"\W+", " ", title).title()
-    duration = "3:00"
-
-    # 🖼 THUMB (ALWAYS WORK)
+    # 🖼 THUMB (ALWAYS WORKING)
     thumb_url = f"https://img.youtube.com/vi/{videoid}/hqdefault.jpg"
     thumb_path = f"{CACHE_DIR}/{videoid}.jpg"
 
@@ -55,7 +63,7 @@ async def get_thumb(videoid: str, title: str, player_username=None):
     bg = Image.new("RGB", (1280, 720), (0, 0, 0))
     draw = ImageDraw.Draw(bg)
 
-    # 🖼 THUMB
+    # 🖼 THUMB IMAGE
     try:
         thumb = Image.open(thumb_path).resize((420, 420)).convert("RGBA")
         thumb = ImageEnhance.Contrast(thumb).enhance(1.15)
@@ -101,10 +109,10 @@ async def get_thumb(videoid: str, title: str, player_username=None):
     draw.line((600, 300, 1000, 300), fill=(255, 120, 40), width=3)
 
     # 📊 META
-    draw.text((600, 330), f"Duration: {duration}", fill="white", font=meta_font)
+    draw.text((600, 330), "Duration: 3:00", fill="white", font=meta_font)
     draw.text((600, 370), f"Player: @{player_username}", fill=(255, 140, 90), font=meta_font)
 
-    # 🎚 PROGRESS BAR
+    # 🎚 BAR
     bar_x, bar_y = 600, 480
     bar_w = 500
 
@@ -113,7 +121,7 @@ async def get_thumb(videoid: str, title: str, player_username=None):
     draw.ellipse((bar_x+bar_w//2-8, bar_y-5, bar_x+bar_w//2+8, bar_y+15), fill="white")
 
     draw.text((600, 510), "00:00", fill="white", font=small_font)
-    draw.text((1080, 510), duration, fill="white", font=small_font)
+    draw.text((1080, 510), "3:00", fill="white", font=small_font)
 
     # 🔥 FOOTER
     draw.text((820, 660), "Powered by Mr Thakur", fill=(255, 120, 40), font=small_font)
