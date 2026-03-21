@@ -3,7 +3,7 @@ import re
 import aiofiles
 import aiohttp
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
-from youtubesearchpython import VideosSearch   # ✅ FIXED
+from youtubesearchpython import VideosSearch   # ✅ FIX
 from config import YOUTUBE_IMG_URL
 
 # Constants
@@ -46,9 +46,10 @@ def trim_to_width(text, font, max_w):
 
 
 async def get_thumb(videoid: str):
-    videoid = str(videoid).split("v=")[-1].strip()
 
+    videoid = str(videoid).split("v=")[-1].strip()
     cache_path = os.path.join(CACHE_DIR, f"{videoid}_v4.png")
+
     if os.path.exists(cache_path):
         return cache_path
 
@@ -66,7 +67,7 @@ async def get_thumb(videoid: str):
         thumbs = data.get("thumbnails") or [{}]
         thumbnail = thumbs[0].get("url", YOUTUBE_IMG_URL)
 
-        duration = data.get("duration")
+        duration = data.get("duration") or "3:00"
         views = (data.get("viewCount") or {}).get("short", "Unknown Views")
 
     except:
@@ -106,7 +107,7 @@ async def get_thumb(videoid: str):
 
     draw = ImageDraw.Draw(bg)
 
-    # 🔤 FONT (FIXED PATH)
+    # 🔤 FONT FIX
     try:
         title_font = ImageFont.truetype("ShashankMusic/assets/font2.ttf", 32)
         regular_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 18)
@@ -131,7 +132,7 @@ async def get_thumb(videoid: str):
     draw.text((BAR_X, BAR_Y + 15), "00:00", fill="black", font=regular_font)
     draw.text((BAR_X + BAR_TOTAL_LEN - 60, BAR_Y + 15), duration_text, fill="black", font=regular_font)
 
-    # 🎛 ICONS (FIXED PATH)
+    # 🎛 ICONS FIX
     icons_path = "ShashankMusic/assets/play_icons.png"
     if os.path.isfile(icons_path):
         ic = Image.open(icons_path).resize((ICONS_W, ICONS_H)).convert("RGBA")
