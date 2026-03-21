@@ -9,45 +9,57 @@ CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 def trim(text, font, max_w):
-    while font.getlength(text) > max_w:
-        text = text[:-1]
-    return text
+    try:
+        while font.getlength(text) > max_w:
+            text = text[:-1]
+        return text
+    except:
+        return text
 
 async def get_thumb(videoid: str):
 
-    videoid = videoid.split("v=")[-1]
+    videoid = str(videoid).split("v=")[-1].strip()
 
     path = f"{CACHE_DIR}/{videoid}.png"
     if os.path.exists(path):
         return path
 
-    # 🔍 YT DATA
+    # 🔍 YT FETCH (SAFE)
     try:
         search = VideosSearch(videoid, limit=1)
-        data = (await search.next())["result"][0]
+        res = await search.next()
+        data = res.get("result", [{}])[0]
 
-        title = data.get("title", "Unknown Song")
+        title = data.get("title") or "Unknown Song"
         title = re.sub(r"\W+", " ", title).title()
 
-        thumb_url = data.get("thumbnails", [{}])[0].get("url")
-        duration = data.get("duration", "3:00")
-        views = data.get("viewCount", {}).get("short", "Unknown views")
+        thumbs = data.get("thumbnails") or []
+        thumb_url = thumbs[0]["url"] if thumbs else None
 
-    except:
+        duration = data.get("duration") or "3:00"
+        views = data.get("viewCount", {}).get("short", "Unknown")
+
+    except Exception:
         title, thumb_url, duration, views = "Unknown Song", None, "3:00", "Unknown"
 
-    # ⬇️ DOWNLOAD
+    # ⬇️ DOWNLOAD SAFE
     thumb_path = f"{CACHE_DIR}/{videoid}_raw.png"
     try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get(thumb_url) as r:
-                if r.status == 200:
-                    async with aiofiles.open(thumb_path, "wb") as f:
-                        await f.write(await r.read())
+        if thumb_url:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(thumb_url) as r:
+                    if r.status == 200:
+                        async with aiofiles.open(thumb_path, "wb") as f:
+                            await f.write(await r.read())
+        else:
+            raise Exception
     except:
-        return None
+        # fallback blank image
+        img = Image.new("RGB", (1280, 720), (30, 30, 30))
+        img.save(path)
+        return path
 
-    # 🖼 BASE BG (BLUR)
+    # 🖼 BASE
     base = Image.open(thumb_path).resize((1280, 720)).convert("RGBA")
     bg = base.filter(ImageFilter.GaussianBlur(25))
     bg = ImageEnhance.Brightness(bg).enhance(0.6)
@@ -80,11 +92,10 @@ async def get_thumb(videoid: str):
     # 📊 META
     draw.text((360, 470), f"YouTube | {views}", fill="black", font=small_font)
 
-    # 🎚 PROGRESS BAR
+    # 🎚 BAR
     bar_x, bar_y = 360, 520
     draw.line((bar_x, bar_y, bar_x+300, bar_y), fill="red", width=6)
     draw.line((bar_x+300, bar_y, bar_x+500, bar_y), fill="gray", width=5)
-
     draw.ellipse((bar_x+290, bar_y-8, bar_x+310, bar_y+8), fill="red")
 
     draw.text((360, 540), "00:00", fill="black", font=small_font)
