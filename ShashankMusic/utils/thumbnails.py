@@ -1,13 +1,20 @@
 import os
+import re
 import aiofiles
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
-from youtubesearchpython import VideosSearch  # ✅ FIXED
+from youtubesearchpython import VideosSearch
 from config import YOUTUBE_IMG_URL
-from ShrutiMusic import app
+from ShashankMusic import app
 
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+def extract_video_id(url: str):
+    if "v=" in url:
+        return url.split("v=")[-1].split("&")[0]
+    return url
 
 
 def trim(text, font, max_w):
@@ -19,7 +26,9 @@ def trim(text, font, max_w):
         return text
 
 
-async def gen_thumb(videoid: str, player_username=None):
+async def get_thumb(videoid: str, player_username=None):
+    videoid = extract_video_id(videoid)
+
     if player_username is None:
         player_username = getattr(app, "username", "MusicBot")
 
@@ -27,38 +36,40 @@ async def gen_thumb(videoid: str, player_username=None):
     if os.path.exists(path):
         return path
 
-    # 🔍 YT FETCH (same)
+    # ===== FETCH YT DATA =====
+    title, duration, views = "Music Playing", "3:00", "Unknown"
+
     try:
-        results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
-        res = await results.next()
+        search = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
+        res = await search.next()
         data = res["result"][0]
 
-        title = data.get("title", "Unknown")
-        thumb_url = data.get("thumbnails", [{}])[0].get("url", YOUTUBE_IMG_URL)
-        duration = data.get("duration", "Live")
-        views = data.get("viewCount", {}).get("short", "0")
+        title = data.get("title", title)
+        duration = data.get("duration", duration)
+        views = data.get("viewCount", {}).get("short", views)
 
     except:
-        title, thumb_url, duration, views = "Unknown", YOUTUBE_IMG_URL, "Live", "0"
+        pass
 
-    thumb_path = f"{CACHE_DIR}/{videoid}.png"
+    title = re.sub(r"\W+", " ", title).title()
 
-    # ⬇ DOWNLOAD
+    # ===== THUMB URL (ALWAYS WORK) =====
+    thumb_url = f"https://img.youtube.com/vi/{videoid}/hqdefault.jpg"
+    thumb_path = f"{CACHE_DIR}/{videoid}.jpg"
+
     try:
         async with aiohttp.ClientSession() as s:
             async with s.get(thumb_url) as r:
                 if r.status == 200:
                     async with aiofiles.open(thumb_path, "wb") as f:
                         await f.write(await r.read())
-                else:
-                    raise Exception
     except:
         thumb_path = None
 
-    # 🖤 BASE BG
+    # ===== BASE BG =====
     bg = Image.new("RGB", (1280, 720), (10, 10, 10))
 
-    # 🔥 IMPROVED GLOW BG (SOFT + DEPTH)
+    # Glow background
     glow = Image.new("RGB", (1280, 720), (0, 0, 0))
     g = ImageDraw.Draw(glow)
     g.ellipse((150, 0, 1150, 720), fill=(255, 110, 30))
@@ -67,14 +78,11 @@ async def gen_thumb(videoid: str, player_username=None):
 
     draw = ImageDraw.Draw(bg)
 
-    # 🖼 THUMB (ENHANCED)
+    # ===== THUMB =====
     try:
         thumb = Image.open(thumb_path).resize((420, 420)).convert("RGBA")
-
-        # contrast + brightness boost
         thumb = ImageEnhance.Contrast(thumb).enhance(1.1)
         thumb = ImageEnhance.Brightness(thumb).enhance(1.05)
-
     except:
         thumb = Image.new("RGBA", (420, 420), (40, 40, 40, 255))
 
@@ -82,14 +90,14 @@ async def gen_thumb(videoid: str, player_username=None):
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, 420, 420), 40, fill=255)
     thumb.putalpha(mask)
 
-    # 🔥 SOFTER SHADOW
+    # Shadow
     shadow = Image.new("RGBA", (460, 460), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
     sd.rounded_rectangle((0, 0, 460, 460), 50, fill=(0, 0, 0, 150))
     shadow = shadow.filter(ImageFilter.GaussianBlur(70))
     bg.paste(shadow, (100, 130), shadow)
 
-    # 🔥 CLEAN BORDER GLOW
+    # Border glow
     border = Image.new("RGBA", (460, 460), (0, 0, 0, 0))
     bd = ImageDraw.Draw(border)
     bd.rounded_rectangle((0, 0, 460, 460), 50, outline=(255, 130, 60), width=4)
@@ -98,31 +106,31 @@ async def gen_thumb(videoid: str, player_username=None):
     bg.paste(border, (100, 130), border)
     bg.paste(thumb, (120, 150), thumb)
 
-    # 🅵🅾🅽🆃 (same)
+    # ===== FONTS =====
     try:
-        title_font = ImageFont.truetype("ShrutiMusic/assets/font.ttf", 44)
-        meta_font = ImageFont.truetype("ShrutiMusic/assets/font.ttf", 30)
-        small_font = ImageFont.truetype("ShrutiMusic/assets/font.ttf", 26)
+        title_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 44)
+        meta_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 30)
+        small_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 26)
     except:
         title_font = meta_font = small_font = ImageFont.load_default()
 
-    # 🔴 BADGE
+    # Badge
     draw.rounded_rectangle((600, 140, 830, 195), 25, fill=(255, 120, 40))
     draw.text((635, 152), "NOW PLAYING", fill="white", font=small_font)
 
-    # 🎵 TITLE (SOFTER GLOW)
+    # Title
     title = trim(title, title_font, 550)
     draw.text((601, 241), title, fill=(255,140,70), font=title_font)
     draw.text((600, 240), title, fill="white", font=title_font)
 
     draw.line((600, 300, 1000, 300), fill=(255, 120, 40), width=3)
 
-    # 📊 META (same)
+    # Meta
     draw.text((600, 330), f"Duration: {duration}", fill="white", font=meta_font)
     draw.text((600, 370), f"Views: {views}", fill=(255, 150, 100), font=meta_font)
     draw.text((600, 410), f"Player: @{player_username}", fill=(255, 150, 100), font=meta_font)
 
-    # 🎚 BAR (SMOOTHER)
+    # Progress bar
     bar_x, bar_y = 600, 480
     bar_w = 500
 
@@ -133,18 +141,10 @@ async def gen_thumb(videoid: str, player_username=None):
     draw.text((600, 510), "00:00", fill="white", font=small_font)
     draw.text((1080, 510), duration, fill="white", font=small_font)
 
-    # 🔥 REFLECTION (SOFTER)
-    reflection = bg.crop((0, 350, 1280, 720)).transpose(Image.FLIP_TOP_BOTTOM)
-    reflection = reflection.filter(ImageFilter.GaussianBlur(40))
-
-    fade = Image.new("L", reflection.size, 90)
-    reflection.putalpha(fade)
-
-    bg.paste(reflection, (0, 520), reflection)
-
-    # 🔥 BRANDING (same)
+    # Footer
     draw.text((820, 660), "Powered by Mr Thakur", fill=(255, 120, 40), font=small_font)
 
+    # Cleanup
     try:
         if thumb_path and os.path.exists(thumb_path):
             os.remove(thumb_path)
