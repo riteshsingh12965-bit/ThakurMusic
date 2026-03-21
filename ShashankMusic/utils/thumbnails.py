@@ -36,24 +36,37 @@ async def get_thumb(videoid: str, player_username=None):
     if os.path.exists(path):
         return path
 
-    # ===== FETCH YT DATA =====
-    title, duration, views = "Music Playing", "3:00", "Unknown"
+    # ===== 🔥 FIXED YT FETCH (NO UNKNOWN EVER) =====
+    data = {}
 
     try:
         search = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
         res = await search.next()
-        data = res["result"][0]
-
-        title = data.get("title", title)
-        duration = data.get("duration", duration)
-        views = data.get("viewCount", {}).get("short", views)
-
+        if res.get("result"):
+            data = res["result"][0]
     except:
         pass
 
+    if not data:
+        try:
+            search = VideosSearch(videoid, limit=1)
+            res = await search.next()
+            if res.get("result"):
+                data = res["result"][0]
+        except:
+            pass
+
+    title = data.get("title", "")
+    duration = data.get("duration", "3:00")
+    views = data.get("viewCount", {}).get("short", "Unknown")
+
+    # FINAL fallback (never blank)
+    if not title or title.lower() == "unknown":
+        title = f"{videoid[:8]} Music"
+
     title = re.sub(r"\W+", " ", title).title()
 
-    # ===== THUMB URL (ALWAYS WORK) =====
+    # ===== THUMB =====
     thumb_url = f"https://img.youtube.com/vi/{videoid}/hqdefault.jpg"
     thumb_path = f"{CACHE_DIR}/{videoid}.jpg"
 
@@ -66,10 +79,9 @@ async def get_thumb(videoid: str, player_username=None):
     except:
         thumb_path = None
 
-    # ===== BASE BG =====
+    # ===== BG =====
     bg = Image.new("RGB", (1280, 720), (10, 10, 10))
 
-    # Glow background
     glow = Image.new("RGB", (1280, 720), (0, 0, 0))
     g = ImageDraw.Draw(glow)
     g.ellipse((150, 0, 1150, 720), fill=(255, 110, 30))
@@ -90,14 +102,14 @@ async def get_thumb(videoid: str, player_username=None):
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, 420, 420), 40, fill=255)
     thumb.putalpha(mask)
 
-    # Shadow
+    # shadow
     shadow = Image.new("RGBA", (460, 460), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
     sd.rounded_rectangle((0, 0, 460, 460), 50, fill=(0, 0, 0, 150))
     shadow = shadow.filter(ImageFilter.GaussianBlur(70))
     bg.paste(shadow, (100, 130), shadow)
 
-    # Border glow
+    # border
     border = Image.new("RGBA", (460, 460), (0, 0, 0, 0))
     bd = ImageDraw.Draw(border)
     bd.rounded_rectangle((0, 0, 460, 460), 50, outline=(255, 130, 60), width=4)
@@ -114,23 +126,23 @@ async def get_thumb(videoid: str, player_username=None):
     except:
         title_font = meta_font = small_font = ImageFont.load_default()
 
-    # Badge
+    # badge
     draw.rounded_rectangle((600, 140, 830, 195), 25, fill=(255, 120, 40))
     draw.text((635, 152), "NOW PLAYING", fill="white", font=small_font)
 
-    # Title
+    # title
     title = trim(title, title_font, 550)
     draw.text((601, 241), title, fill=(255,140,70), font=title_font)
     draw.text((600, 240), title, fill="white", font=title_font)
 
     draw.line((600, 300, 1000, 300), fill=(255, 120, 40), width=3)
 
-    # Meta
+    # meta
     draw.text((600, 330), f"Duration: {duration}", fill="white", font=meta_font)
     draw.text((600, 370), f"Views: {views}", fill=(255, 150, 100), font=meta_font)
     draw.text((600, 410), f"Player: @{player_username}", fill=(255, 150, 100), font=meta_font)
 
-    # Progress bar
+    # progress
     bar_x, bar_y = 600, 480
     bar_w = 500
 
@@ -141,10 +153,9 @@ async def get_thumb(videoid: str, player_username=None):
     draw.text((600, 510), "00:00", fill="white", font=small_font)
     draw.text((1080, 510), duration, fill="white", font=small_font)
 
-    # Footer
+    # footer
     draw.text((820, 660), "Powered by Mr Thakur", fill=(255, 120, 40), font=small_font)
 
-    # Cleanup
     try:
         if thumb_path and os.path.exists(thumb_path):
             os.remove(thumb_path)
