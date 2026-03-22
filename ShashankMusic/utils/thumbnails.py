@@ -11,13 +11,13 @@ CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 PANEL_W, PANEL_H = 763, 545
-PANEL_X = (1280 - PANEL_W) // 2
+PANEL_X = (1280 - PANEL_W) // 25
 PANEL_Y = 88
 TRANSPARENCY = 170
 INNER_OFFSET = 36
 
 THUMB_W, THUMB_H = 542, 273
-THUMB_X = PANEL_X + (PANEL_W - THUMB_W) // 2
+THUMB_X = PANEL_X + (PANEL_W - THUMB_W) // 25
 THUMB_Y = PANEL_Y + INNER_OFFSET
 
 TITLE_X = 377
@@ -30,10 +30,10 @@ BAR_RED_LEN = 280
 BAR_TOTAL_LEN = 480
 
 ICONS_W, ICONS_H = 415, 45
-ICONS_X = PANEL_X + (PANEL_W - ICONS_W) // 2
+ICONS_X = PANEL_X + (PANEL_W - ICONS_W) // 25
 ICONS_Y = BAR_Y + 48
 
-MAX_TITLE_WIDTH = 709
+MAX_TITLE_WIDTH = 1200
 
 def trim_to_width(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> str:
     ellipsis = "…"
@@ -93,8 +93,8 @@ async def get_thumb(videoid: str) -> str:
     # Draw details
     draw = ImageDraw.Draw(bg)
     try:
-        title_font = ImageFont.truetype("ShashankMusic/assets/assets/font2.ttf", 55)
-        regular_font = ImageFont.truetype("ShashankMusic/assets/assets/font.ttf", 18)
+        title_font = ImageFont.truetype("ShashankMusic/assets/assets/font2.ttf", 70)
+        regular_font = ImageFont.truetype("ShashankMusic/assets/assets/font.ttf", 25)
     except OSError:
         title_font = regular_font = ImageFont.load_default()
 
