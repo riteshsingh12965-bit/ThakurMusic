@@ -5,7 +5,7 @@ import aiofiles
 import traceback
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
-from py_yt import VideosSearch
+from youtubesearchpython import VideosSearch   # ✅ FIXED
 from ShashankMusic import app
 import math
 
@@ -83,7 +83,8 @@ def create_shape_mask(size):
 async def gen_thumb(videoid: str):
     url = f"https://www.youtube.com/watch?v={videoid}"
     thumb_path = None
-    
+
+    # ✅ SAFE YOUTUBE FETCH
     try:
         results = VideosSearch(url, limit=1)
         result = (await results.next())["result"][0]
@@ -94,21 +95,31 @@ async def gen_thumb(videoid: str):
         views = result.get("viewCount", {}).get("short", "Unknown Views")
         channel = result.get("channel", {}).get("name", "Unknown Channel")
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(thumburl) as resp:
-                if resp.status == 200:
-                    thumb_path = CACHE_DIR / f"{videoid}.png"
-                    async with aiofiles.open(thumb_path, "wb") as f:
-                        await f.write(await resp.read())
-
-        base_img = Image.open(thumb_path if thumb_path else DEFAULT_THUMB).convert("RGBA")
-
-    except:
-        base_img = Image.open(DEFAULT_THUMB).convert("RGBA")
+    except Exception as e:
+        print(f"[YouTube Error] {e}")
         title = "ShashankMusic"
         duration = "Unknown"
         views = "Unknown Views"
         channel = "ShashankBots"
+        thumburl = None
+
+    # ✅ SAFE DOWNLOAD
+    try:
+        if thumburl:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(thumburl) as resp:
+                    if resp.status == 200:
+                        thumb_path = CACHE_DIR / f"{videoid}.png"
+                        async with aiofiles.open(thumb_path, "wb") as f:
+                            await f.write(await resp.read())
+    except:
+        thumb_path = None
+
+    # ✅ SAFE IMAGE LOAD
+    if thumb_path and thumb_path.exists():
+        base_img = Image.open(thumb_path).convert("RGBA")
+    else:
+        base_img = Image.open(DEFAULT_THUMB).convert("RGBA")
 
     try:
         canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H))
@@ -126,7 +137,7 @@ async def gen_thumb(videoid: str):
 
         draw = ImageDraw.Draw(canvas)
 
-        # BRAND NAME
+        # BRAND
         brand_font = ImageFont.truetype(FONT_BOLD_PATH, 42)
         draw.text((40, 30), app.username, fill="white", font=brand_font)
 
