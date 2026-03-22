@@ -2,151 +2,133 @@ import os
 import re
 import aiofiles
 import aiohttp
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 from unidecode import unidecode
 from py_yt import VideosSearch
 from ShashankMusic import app
 from config import YOUTUBE_IMG_URL
 
+CACHE_DIR = "cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+
 def changeImageSize(maxWidth, maxHeight, image):
     widthRatio = maxWidth / image.size[0]
     heightRatio = maxHeight / image.size[1]
-    newWidth = int(widthRatio * image.size[0])
-    newHeight = int(heightRatio * image.size[1])
-    newImage = image.resize((newWidth, newHeight))
-    return newImage
+    return image.resize((int(widthRatio * image.size[0]), int(heightRatio * image.size[1])))
+
 
 def truncate(text):
-    text = unidecode(text)  # ✅ unicode fix
-    list = text.split(" ")
-    text1 = ""
-    text2 = ""    
-    for i in list:
-        if len(text1) + len(i) < 30:        
-            text1 += " " + i
-        elif len(text2) + len(i) < 30:       
-            text2 += " " + i
+    text = unidecode(text)
+    words = text.split()
+    t1, t2 = "", ""
+    for w in words:
+        if len(t1 + w) < 30:
+            t1 += " " + w
+        elif len(t2 + w) < 30:
+            t2 += " " + w
+    return [t1.strip(), t2.strip()]
 
-    text1 = text1.strip()
-    text2 = text2.strip()     
-    return [text1,text2]
 
-def crop_center_circle(img, output_size, border, crop_scale=1.5):
-    half_the_width = img.size[0] / 2
-    half_the_height = img.size[1] / 2
-    larger_size = int(output_size * crop_scale)
-    img = img.crop(
-        (
-            half_the_width - larger_size/2,
-            half_the_height - larger_size/2,
-            half_the_width + larger_size/2,
-            half_the_height + larger_size/2
-        )
-    )
-    
-    img = img.resize((output_size - 2*border, output_size - 2*border))
-    
-    final_img = Image.new("RGBA", (output_size, output_size), "white")
-    
-    mask_main = Image.new("L", (output_size - 2*border, output_size - 2*border), 0)
-    draw_main = ImageDraw.Draw(mask_main)
-    draw_main.ellipse((0, 0, output_size - 2*border, output_size - 2*border), fill=255)
-    
-    final_img.paste(img, (border, border), mask_main)
-    
-    mask_border = Image.new("L", (output_size, output_size), 0)
-    draw_border = ImageDraw.Draw(mask_border)
-    draw_border.ellipse((0, 0, output_size, output_size), fill=255)
-    
-    result = Image.composite(final_img, Image.new("RGBA", final_img.size, (0, 0, 0, 0)), mask_border)
-    
-    return result
+def crop_center_circle(img, size, border):
+    img = img.resize((size - 2*border, size - 2*border))
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, img.size[0], img.size[1]), fill=255)
+
+    final = Image.new("RGBA", (size, size))
+    final.paste(img, (border, border), mask)
+    return final
 
 
 async def get_thumb(videoid):
-    if os.path.isfile(f"cache/{videoid}_v4.png"):
-        return f"cache/{videoid}_v4.png"
 
-    url = f"https://www.youtube.com/watch?v={videoid}"
-    results = VideosSearch(url, limit=1)
+    final_path = f"{CACHE_DIR}/{videoid}_v4.png"
+    if os.path.exists(final_path):
+        return final_path
 
-    for result in (await results.next())["result"]:
-        try:
-            title = unidecode(result["title"])  # ✅ unicode safe
-            title = re.sub("\W+", " ", title)
-            title = title.title()
-        except:
-            title = "Unsupported Title"
-        try:
-            duration = result["duration"]
-        except:
-            duration = "Unknown Mins"
-        thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        try:
-            views = result["viewCount"]["short"]
-        except:
-            views = "Unknown Views"
-        try:
-            channel = result["channel"]["name"]
-        except:
-            channel = "Unknown Channel"
+    # 🎯 DATA FETCH
+    try:
+        data = (await VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1).next())["result"][0]
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(thumbnail) as resp:
-            if resp.status == 200:
-                f = await aiofiles.open(f"cache/thumb{videoid}.png", mode="wb")
-                await f.write(await resp.read())
-                await f.close()
+        title = unidecode(data.get("title", "Song"))
+        title = re.sub(r"\W+", " ", title).title()
 
-    youtube = Image.open(f"cache/thumb{videoid}.png")
-    image1 = changeImageSize(1280, 720, youtube)
-    image2 = image1.convert("RGBA")
-    background = image2.filter(filter=ImageFilter.BoxBlur(20))
-    enhancer = ImageEnhance.Brightness(background)
-    background = enhancer.enhance(0.6)
+        duration = data.get("duration", "3:00")
+        views = data.get("viewCount", {}).get("short", "0")
+        channel = data.get("channel", {}).get("name", "Channel")
 
-    draw = ImageDraw.Draw(background)
+        thumbnail = data["thumbnails"][0]["url"].split("?")[0]
 
-    arial = ImageFont.truetype("ShashankMusic/assets/font2.ttf", 30)
-    font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 30)
-    title_font = ImageFont.truetype("ShashankMusic/assets/font3.ttf", 45)
+    except:
+        title, duration, views, channel = "Shashank Music", "3:00", "0", "Channel"
+        thumbnail = YOUTUBE_IMG_URL
 
-    circle_thumbnail = crop_center_circle(youtube, 400, 20)
-    circle_thumbnail = circle_thumbnail.resize((400, 400))
-    background.paste(circle_thumbnail, (120, 160), circle_thumbnail)
-
-    text_x_position = 565
-
-    title1 = truncate(title)
-    draw.text((text_x_position, 180), title1[0], fill=(255, 255, 255), font=title_font)
-    draw.text((text_x_position, 230), title1[1], fill=(255, 255, 255), font=title_font)
-
-    draw.text((text_x_position, 320), f"{channel}  |  {views[:23]}", (255, 255, 255), font=arial)
-
-    # 🎵 PROGRESS BAR
-    line_length = 580  
-    red_length = int(line_length * 0.6)
-
-    draw.line([(text_x_position, 380), (text_x_position + red_length, 380)], fill="red", width=9)
-    draw.line([(text_x_position + red_length, 380), (text_x_position + line_length, 380)], fill="white", width=8)
-
-    draw.ellipse([
-        text_x_position + red_length - 10, 370,
-        text_x_position + red_length + 10, 390
-    ], fill="red")
-
-    draw.text((text_x_position, 400), "00:00", (255, 255, 255), font=arial)
-    draw.text((1080, 400), duration, (255, 255, 255), font=arial)
-
-    # 🎮 ICONS
-    play_icons = Image.open("ShashankMusic/assets/play_icons.png")
-    play_icons = play_icons.resize((580, 62))
-    background.paste(play_icons, (text_x_position, 450), play_icons)
+    # 🎯 DOWNLOAD THUMB
+    thumb_path = f"{CACHE_DIR}/{videoid}.png"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(thumbnail) as resp:
+                if resp.status == 200:
+                    async with aiofiles.open(thumb_path, "wb") as f:
+                        await f.write(await resp.read())
+    except:
+        return YOUTUBE_IMG_URL
 
     try:
-        os.remove(f"cache/thumb{videoid}.png")
+        youtube = Image.open(thumb_path)
+    except:
+        return YOUTUBE_IMG_URL
+
+    # 🎯 BACKGROUND
+    image = changeImageSize(1280, 720, youtube)
+    bg = image.filter(ImageFilter.BoxBlur(20))
+    bg = ImageEnhance.Brightness(bg).enhance(0.6)
+
+    draw = ImageDraw.Draw(bg)
+
+    # 🎯 FONT SAFE
+    try:
+        title_font = ImageFont.truetype("ShashankMusic/assets/font3.ttf", 45)
+        small_font = ImageFont.truetype("ShashankMusic/assets/font2.ttf", 30)
+    except:
+        title_font = small_font = ImageFont.load_default()
+
+    # 🎯 CIRCLE THUMB
+    circle = crop_center_circle(youtube, 400, 20)
+    bg.paste(circle, (120, 160), circle)
+
+    x = 565
+    t1, t2 = truncate(title)
+
+    draw.text((x, 180), t1, fill="white", font=title_font)
+    draw.text((x, 230), t2, fill="white", font=title_font)
+
+    draw.text((x, 320), f"{channel} | {views}", fill="white", font=small_font)
+
+    # 🎯 PROGRESS BAR
+    total = 580
+    done = int(total * 0.6)
+
+    draw.line((x, 380, x + done, 380), fill="red", width=9)
+    draw.line((x + done, 380, x + total, 380), fill="white", width=8)
+
+    draw.ellipse((x + done - 10, 370, x + done + 10, 390), fill="red")
+
+    draw.text((x, 400), "00:00", fill="white", font=small_font)
+    draw.text((1080, 400), duration, fill="white", font=small_font)
+
+    # 🎯 ICONS SAFE
+    try:
+        icons = Image.open("ShashankMusic/assets/play_icons.png").resize((580, 62))
+        bg.paste(icons, (x, 450), icons)
     except:
         pass
 
-    background.save(f"cache/{videoid}_v4.png")
-    return f"cache/{videoid}_v4.png"
+    # CLEANUP
+    try:
+        os.remove(thumb_path)
+    except:
+        pass
+
+    bg.save(final_path)
+    return final_path
