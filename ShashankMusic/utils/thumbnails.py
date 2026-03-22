@@ -5,7 +5,7 @@ import aiofiles
 import traceback
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
-from youtubesearchpython import VideosSearch   # ✅ FIXED
+from youtubesearchpython import VideosSearch
 from ShashankMusic import app
 import math
 
@@ -19,60 +19,6 @@ FONT_BOLD_PATH = "ShashankMusic/assets/font3.ttf"
 DEFAULT_THUMB = "ShashankMusic/assets/ShashankBots.jpg"
 
 
-def wrap_text(draw, text, font, max_width):
-    words = text.split()
-    lines = []
-    current_line = ""
-    
-    for word in words:
-        test_line = current_line + (" " if current_line else "") + word
-        if draw.textlength(test_line, font=font) <= max_width:
-            current_line = test_line
-        else:
-            if current_line:
-                lines.append(current_line)
-            current_line = word
-    
-    if current_line:
-        lines.append(current_line)
-    
-    return lines[:2]
-
-
-def random_gradient():
-    colors = [
-        [(15, 12, 41), (48, 43, 99), (36, 36, 62)],
-        [(10, 10, 10), (35, 35, 40), (20, 20, 25)],
-        [(26, 26, 46), (56, 56, 86), (40, 40, 60)],
-        [(20, 25, 35), (45, 50, 70), (30, 35, 50)],
-        [(12, 17, 30), (38, 43, 65), (25, 30, 45)],
-    ]
-    return random.choice(colors)
-
-
-def apply_gradient(canvas, colors):
-    overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    
-    for y in range(CANVAS_H):
-        progress = y / CANVAS_H
-        
-        if progress < 0.4:
-            t = progress / 0.4
-            r = int(colors[0][0] * (1-t) + colors[1][0] * t)
-            g = int(colors[0][1] * (1-t) + colors[1][1] * t)
-            b = int(colors[0][2] * (1-t) + colors[1][2] * t)
-        else:
-            t = (progress - 0.4) / 0.6
-            r = int(colors[1][0] * (1-t) + colors[2][0] * t)
-            g = int(colors[1][1] * (1-t) + colors[2][1] * t)
-            b = int(colors[1][2] * (1-t) + colors[2][2] * t)
-        
-        draw.line([(0, y), (CANVAS_W, y)], fill=(r, g, b, 255))
-    
-    return Image.alpha_composite(canvas, overlay)
-
-
 def create_shape_mask(size):
     mask = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(mask)
@@ -80,30 +26,54 @@ def create_shape_mask(size):
     return mask
 
 
-async def gen_thumb(videoid: str):
+def random_gradient():
+    colors = [
+        [(15, 12, 41), (48, 43, 99), (36, 36, 62)],
+        [(10, 10, 10), (35, 35, 40), (20, 20, 25)],
+        [(26, 26, 46), (56, 56, 86), (40, 40, 60)],
+    ]
+    return random.choice(colors)
+
+
+def apply_gradient(canvas, colors):
+    overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    for y in range(CANVAS_H):
+        progress = y / CANVAS_H
+        r = int(colors[0][0] * (1-progress) + colors[1][0] * progress)
+        g = int(colors[0][1] * (1-progress) + colors[1][1] * progress)
+        b = int(colors[0][2] * (1-progress) + colors[1][2] * progress)
+
+        draw.line([(0, y), (CANVAS_W, y)], fill=(r, g, b, 255))
+
+    return Image.alpha_composite(canvas, overlay)
+
+
+async def get_thumb(videoid: str):
     url = f"https://www.youtube.com/watch?v={videoid}"
     thumb_path = None
 
-    # ✅ SAFE YOUTUBE FETCH
+    # 🎧 FETCH DATA
     try:
         results = VideosSearch(url, limit=1)
         result = (await results.next())["result"][0]
 
-        title = result.get("title", "Unknown Title")
+        title = result.get("title", "Unknown")
         duration = result.get("duration", "Unknown")
         thumburl = result["thumbnails"][0]["url"].split("?")[0]
-        views = result.get("viewCount", {}).get("short", "Unknown Views")
-        channel = result.get("channel", {}).get("name", "Unknown Channel")
+        views = result.get("viewCount", {}).get("short", "Unknown")
+        channel = result.get("channel", {}).get("name", "Unknown")
 
     except Exception as e:
-        print(f"[YouTube Error] {e}")
+        print(f"[YT ERROR] {e}")
         title = "ShashankMusic"
         duration = "Unknown"
         views = "Unknown Views"
         channel = "ShashankBots"
         thumburl = None
 
-    # ✅ SAFE DOWNLOAD
+    # 🌐 DOWNLOAD IMAGE
     try:
         if thumburl:
             async with aiohttp.ClientSession() as session:
@@ -115,7 +85,7 @@ async def gen_thumb(videoid: str):
     except:
         thumb_path = None
 
-    # ✅ SAFE IMAGE LOAD
+    # 🖼️ LOAD IMAGE
     if thumb_path and thumb_path.exists():
         base_img = Image.open(thumb_path).convert("RGBA")
     else:
@@ -126,14 +96,11 @@ async def gen_thumb(videoid: str):
         canvas = apply_gradient(canvas, random_gradient())
 
         art_size = 450
-        art_x = 80
-        art_y = (CANVAS_H - art_size) // 2
-
-        mask = create_shape_mask(art_size)
         art = base_img.resize((art_size, art_size))
+        mask = create_shape_mask(art_size)
         art.putalpha(mask)
 
-        canvas.paste(art, (art_x, art_y), art)
+        canvas.paste(art, (80, 150), art)
 
         draw = ImageDraw.Draw(canvas)
 
