@@ -14,7 +14,6 @@
 
 aiofiles
 aiohttp
-asyncio
 beautifulsoup4
 dnspython
 ffmpeg-python
@@ -37,7 +36,5 @@ spotipy
 tgcrypto
 unidecode
 yt-dlp
-youtube-search
 youtube-search-python
 wget
-git+https://github.com/yt-dlp/yt-dlp
