@@ -16,7 +16,7 @@ aiofiles
 aiohttp
 apscheduler
 asyncio
-bard 
+bard
 beautifulsoup4
 bs4
 dnspython
@@ -30,7 +30,7 @@ heroku3
 httpx
 instaloader
 lexica-api
-motor 
+motor
 numpy
 opencv-python
 pillow==9.5.0
@@ -47,8 +47,7 @@ pyshorteners
 pyttsx3
 pytz
 pyrofork
-py-tgcalls
-pyrofork
+py-tgcalls==0.9.7
 pyyaml
 py-yt-search
 qrcode
