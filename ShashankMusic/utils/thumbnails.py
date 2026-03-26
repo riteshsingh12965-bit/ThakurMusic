@@ -40,11 +40,16 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
 
     path = f"{CACHE_DIR}/{videoid}.png"
     thumb_file = f"{CACHE_DIR}/{videoid}.jpg"
-    thumb_url = f"https://img.youtube.com/vi/{videoid}/hqdefault.jpg"
 
-    # If cached final thumb exists
-    if os.path.exists(path) and os.path.getsize(path) > 0:
-        return path
+    # ALWAYS regenerate fresh thumbnail
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except:
+        pass
+
+    # Better thumbnail source
+    thumb_url = f"https://img.youtube.com/vi/{videoid}/maxresdefault.jpg"
 
     # -------------------------
     # Download thumbnail
@@ -56,7 +61,13 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
                     async with aiofiles.open(thumb_file, "wb") as f:
                         await f.write(await r.read())
                 else:
-                    thumb_file = None
+                    thumb_url = f"https://img.youtube.com/vi/{videoid}/hqdefault.jpg"
+                    async with s.get(thumb_url) as r2:
+                        if r2.status == 200:
+                            async with aiofiles.open(thumb_file, "wb") as f:
+                                await f.write(await r2.read())
+                        else:
+                            thumb_file = None
     except:
         thumb_file = None
 
@@ -74,125 +85,110 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     # =========================
     # BACKGROUND
     # =========================
-    bg = original.resize((1280, 720)).filter(ImageFilter.GaussianBlur(22))
+    bg = original.resize((1280, 720)).filter(ImageFilter.GaussianBlur(26))
     bg = bg.convert("RGBA")
 
-    dark_overlay = Image.new("RGBA", (1280, 720), (0, 0, 0, 145))
+    dark_overlay = Image.new("RGBA", (1280, 720), (0, 0, 0, 155))
     bg = Image.alpha_composite(bg, dark_overlay)
 
-    # warm glow
     glow = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    glow_draw.ellipse((180, 120, 1100, 690), fill=(255, 160, 90, 50))
-    glow = glow.filter(ImageFilter.GaussianBlur(120))
+    glow_draw.ellipse((140, 70, 1140, 700), fill=(255, 170, 90, 40))
+    glow = glow.filter(ImageFilter.GaussianBlur(140))
     bg = Image.alpha_composite(bg, glow)
 
     draw = ImageDraw.Draw(bg)
 
     # =========================
-    # CENTER PLAYER CARD
+    # BIG CENTER CARD
     # =========================
-    card_x, card_y = 290, 80
-    card_w, card_h = 700, 560
+    card_x, card_y = 220, 55
+    card_w, card_h = 840, 610
 
-    # shadow
-    shadow = Image.new("RGBA", (card_w + 40, card_h + 40), (0, 0, 0, 0))
+    shadow = Image.new("RGBA", (card_w + 50, card_h + 50), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((0, 0, card_w + 40, card_h + 40), 65, fill=(0, 0, 0, 150))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(28))
-    bg.paste(shadow, (card_x - 20, card_y - 10), shadow)
+    sd.rounded_rectangle((0, 0, card_w + 50, card_h + 50), 70, fill=(0, 0, 0, 160))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(32))
+    bg.paste(shadow, (card_x - 25, card_y - 10), shadow)
 
-    # card
-    card = Image.new("RGBA", (card_w, card_h), (18, 18, 20, 240))
+    card = Image.new("RGBA", (card_w, card_h), (16, 16, 18, 242))
     card_mask = Image.new("L", (card_w, card_h), 0)
-    ImageDraw.Draw(card_mask).rounded_rectangle((0, 0, card_w, card_h), 55, fill=255)
+    ImageDraw.Draw(card_mask).rounded_rectangle((0, 0, card_w, card_h), 60, fill=255)
     bg.paste(card, (card_x, card_y), card_mask)
 
     # =========================
     # TOP PREVIEW IMAGE
     # =========================
-    preview = original.convert("RGBA").resize((610, 265))
-    preview_mask = Image.new("L", (610, 265), 0)
-    ImageDraw.Draw(preview_mask).rounded_rectangle((0, 0, 610, 265), 35, fill=255)
+    preview = original.convert("RGBA").resize((670, 250))
+    preview_mask = Image.new("L", (670, 250), 0)
+    ImageDraw.Draw(preview_mask).rounded_rectangle((0, 0, 670, 250), 35, fill=255)
     preview.putalpha(preview_mask)
 
-    # border
-    border = Image.new("RGBA", (618, 273), (0, 0, 0, 0))
+    border = Image.new("RGBA", (678, 258), (0, 0, 0, 0))
     bd = ImageDraw.Draw(border)
-    bd.rounded_rectangle((0, 0, 618, 273), 38, outline=(225, 185, 120), width=4)
+    bd.rounded_rectangle((0, 0, 678, 258), 38, outline=(225, 185, 120), width=4)
 
-    bg.paste(border, (331, 97), border)
-    bg.paste(preview, (335, 101), preview)
+    bg.paste(border, (301, 91), border)
+    bg.paste(preview, (305, 95), preview)
 
     # =========================
     # FONTS
     # =========================
     try:
-        small_font = ImageFont.truetype(FONT, 24)
-        med_font = ImageFont.truetype(FONT, 32)
-        title_font = ImageFont.truetype(FONT, 44)
-        time_font = ImageFont.truetype(FONT, 26)
-        button_font = ImageFont.truetype(FONT, 44)
-        badge_font = ImageFont.truetype(FONT, 26)
+        small_font = ImageFont.truetype(FONT, 28)
+        med_font = ImageFont.truetype(FONT, 36)
+        title_font = ImageFont.truetype(FONT, 56)
+        time_font = ImageFont.truetype(FONT, 28)
+        button_font = ImageFont.truetype(FONT, 52)
     except:
         small_font = ImageFont.load_default()
         med_font = ImageFont.load_default()
         title_font = ImageFont.load_default()
         time_font = ImageFont.load_default()
         button_font = ImageFont.load_default()
-        badge_font = ImageFont.load_default()
 
     # =========================
     # TEXT
     # =========================
-    title = trim(title, title_font, 520)
+    title = trim(title, title_font, 620)
 
-    # now playing
     draw.text((640, 395), "Now Playing", fill=(210, 210, 210), font=med_font, anchor="mm")
-
-    # title
-    draw.text((640, 455), title, fill="white", font=title_font, anchor="mm")
+    draw.text((640, 470), title, fill="white", font=title_font, anchor="mm")
 
     # =========================
     # PROGRESS BAR
     # =========================
-    bar_x1 = 380
-    bar_x2 = 910
-    bar_y = 530
+    bar_x1 = 360
+    bar_x2 = 920
+    bar_y = 545
 
-    # base
-    draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 8), 10, fill=(110, 110, 110))
+    draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 10), 10, fill=(95, 95, 95))
 
-    # progress fill
     progress = 0.40
     prog_x = int(bar_x1 + (bar_x2 - bar_x1) * progress)
-    draw.rounded_rectangle((bar_x1, bar_y, prog_x, bar_y + 8), 10, fill=(225, 185, 120))
+    draw.rounded_rectangle((bar_x1, bar_y, prog_x, bar_y + 10), 10, fill=(225, 185, 120))
 
-    # knob
-    draw.ellipse((prog_x - 10, bar_y - 8, prog_x + 10, bar_y + 12), fill="white")
+    draw.ellipse((prog_x - 11, bar_y - 9, prog_x + 11, bar_y + 13), fill="white")
 
-    # time
-    draw.text((380, 565), "1:24", fill=(170, 170, 170), font=time_font)
-    draw.text((875, 565), duration, fill=(170, 170, 170), font=time_font)
+    draw.text((360, 585), "1:24", fill=(170, 170, 170), font=time_font)
+    draw.text((875, 585), duration, fill=(170, 170, 170), font=time_font)
 
     # =========================
-    # PLAYER BUTTONS
+    # BUTTONS
     # =========================
-    # Use text buttons instead of emoji (emoji square issue fix)
-    draw.text((520, 625), "<<", fill="white", font=button_font, anchor="mm")
+    draw.text((500, 635), "<<", fill="white", font=button_font, anchor="mm")
 
-    draw.rounded_rectangle((610, 575, 720, 675), 28, fill=(55, 55, 60))
-    draw.text((665, 625), "II", fill="white", font=button_font, anchor="mm")
+    draw.rounded_rectangle((585, 585, 695, 685), 28, fill=(55, 55, 60))
+    draw.text((640, 635), "II", fill="white", font=button_font, anchor="mm")
 
-    draw.text((785, 625), ">>", fill="white", font=button_font, anchor="mm")
+    draw.text((780, 635), ">>", fill="white", font=button_font, anchor="mm")
 
     # =========================
     # SAVE
     # =========================
     bg = bg.convert("RGB")
-    bg.save(path, quality=95)
+    bg.save(path, quality=96)
 
-    # cleanup
     try:
         if thumb_file and os.path.exists(thumb_file):
             os.remove(thumb_file)
