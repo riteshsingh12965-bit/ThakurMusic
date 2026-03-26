@@ -66,7 +66,7 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     path = f"{CACHE_DIR}/{videoid}.png"
     thumb_file = f"{CACHE_DIR}/{videoid}.jpg"
 
-    # Fresh thumbnail
+    # Always fresh
     try:
         if os.path.exists(path):
             os.remove(path)
@@ -103,103 +103,104 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
         if thumb_file and os.path.exists(thumb_file):
             original = Image.open(thumb_file).convert("RGB")
         else:
-            raise Exception("No thumbnail")
+            raise Exception("No thumb")
     except:
         original = Image.new("RGB", (1280, 720), (30, 30, 30))
 
     original = ImageOps.fit(original, (1280, 720), method=Image.LANCZOS)
 
     # =========================
-    # BACKGROUND (FULL BIG)
+    # BACKGROUND
     # =========================
-    bg = original.copy().filter(ImageFilter.GaussianBlur(28))
-    bg = ImageEnhance.Brightness(bg).enhance(0.30)
-    bg = ImageEnhance.Color(bg).enhance(0.85)
+    bg = original.copy().filter(ImageFilter.GaussianBlur(26))
+    bg = ImageEnhance.Brightness(bg).enhance(0.28)
+    bg = ImageEnhance.Color(bg).enhance(0.9)
     bg = bg.convert("RGBA")
 
-    dark_overlay = Image.new("RGBA", (1280, 720), (0, 0, 0, 125))
-    bg = Image.alpha_composite(bg, dark_overlay)
+    dark = Image.new("RGBA", (1280, 720), (0, 0, 0, 135))
+    bg = Image.alpha_composite(bg, dark)
 
-    # Warm glow
+    # Cinematic glow
     glow = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.ellipse((250, 60, 1050, 660), fill=(255, 170, 80, 28))
+    gd.ellipse((260, 80, 1020, 650), fill=(230, 190, 120, 25))
     glow = glow.filter(ImageFilter.GaussianBlur(120))
     bg = Image.alpha_composite(bg, glow)
 
     draw = ImageDraw.Draw(bg)
 
     # =========================
-    # MAIN BIG CARD
+    # MAIN CARD (AADAT STYLE)
     # =========================
-    card_x, card_y = 250, 55
-    card_w, card_h = 780, 610
+    card_x, card_y = 305, 42
+    card_w, card_h = 670, 635
 
-    # shadow
+    # Shadow
     shadow = Image.new("RGBA", (card_w + 80, card_h + 80), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((0, 0, card_w + 80, card_h + 80), 65, fill=(0, 0, 0, 190))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(35))
-    bg.paste(shadow, (card_x - 40, card_y + 25), shadow)
+    sd.rounded_rectangle((0, 0, card_w + 80, card_h + 80), 58, fill=(0, 0, 0, 185))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(32))
+    bg.paste(shadow, (card_x - 40, card_y + 28), shadow)
 
-    # card
-    card = Image.new("RGBA", (card_w, card_h), (18, 18, 20, 242))
+    # Card
+    card = Image.new("RGBA", (card_w, card_h), (17, 17, 20, 245))
     card_mask = Image.new("L", (card_w, card_h), 0)
-    ImageDraw.Draw(card_mask).rounded_rectangle((0, 0, card_w, card_h), 55, fill=255)
+    ImageDraw.Draw(card_mask).rounded_rectangle((0, 0, card_w, card_h), 48, fill=255)
     bg.paste(card, (card_x, card_y), card_mask)
 
     # =========================
-    # TOP IMAGE (BIG & CLEAN)
+    # TOP IMAGE (BIG SAME STYLE)
     # =========================
-    preview = ImageOps.fit(original.convert("RGBA"), (640, 250), method=Image.LANCZOS)
-    preview_mask = Image.new("L", (640, 250), 0)
-    ImageDraw.Draw(preview_mask).rounded_rectangle((0, 0, 640, 250), 38, fill=255)
+    preview = ImageOps.fit(original.convert("RGBA"), (560, 245), method=Image.LANCZOS)
+
+    preview_mask = Image.new("L", (560, 245), 0)
+    ImageDraw.Draw(preview_mask).rounded_rectangle((0, 0, 560, 245), 34, fill=255)
     preview.putalpha(preview_mask)
 
-    preview_x = 320
-    preview_y = 95
+    preview_x = 360
+    preview_y = 78
     bg.paste(preview, (preview_x, preview_y), preview)
 
-    # gold border
-    border = Image.new("RGBA", (648, 258), (0, 0, 0, 0))
+    # Gold border
+    border = Image.new("RGBA", (568, 253), (0, 0, 0, 0))
     bd = ImageDraw.Draw(border)
-    bd.rounded_rectangle((0, 0, 648, 258), 40, outline=(226, 191, 123), width=4)
+    bd.rounded_rectangle((0, 0, 568, 253), 36, outline=(226, 191, 123), width=4)
     bg.paste(border, (preview_x - 4, preview_y - 4), border)
 
-    # 4k
-    tag_font = load_font(28)
-    draw.text((340, 318), "4k", fill="white", font=tag_font)
+    # 4k text
+    tag_font = load_font(30)
+    draw.text((378, 292), "4k", fill="white", font=tag_font)
 
     # =========================
     # FONTS
     # =========================
-    top_font = load_font(18)
-    now_font = load_font(34)
+    top_font = load_font(17)
+    now_font = load_font(36)
     title_font = load_font(52)
-    meta_font = load_font(22)
+    meta_font = load_font(23)
     time_font = load_font(24)
-    btn_font = load_font(62)
-    pause_font = load_font(72)
+    side_btn_font = load_font(56)
+    pause_font = load_font(78)
 
     # =========================
-    # TEXTS
+    # TEXT
     # =========================
-    draw.text((640, 82), "NOW PLAYING • PREMIUM PLAYER", fill=(175, 175, 175), font=top_font, anchor="mm")
+    draw.text((640, 62), "NOW PLAYING • PREMIUM PLAYER", fill=(175, 175, 175), font=top_font, anchor="mm")
 
-    clean_title = trim(title.upper(), title_font, 620)
+    clean_title = trim(title.upper(), title_font, 570)
 
-    draw.text((640, 395), "Now Playing", fill=(200, 200, 200), font=now_font, anchor="mm")
-    draw.text((640, 470), clean_title, fill="white", font=title_font, anchor="mm")
-    draw.text((640, 515), views, fill=(160, 160, 160), font=meta_font, anchor="mm")
+    draw.text((640, 362), "Now Playing", fill=(205, 205, 205), font=now_font, anchor="mm")
+    draw.text((640, 438), clean_title, fill="white", font=title_font, anchor="mm")
+    draw.text((640, 485), views, fill=(155, 155, 155), font=meta_font, anchor="mm")
 
     # =========================
     # PROGRESS BAR
     # =========================
-    bar_x1 = 350
-    bar_x2 = 930
-    bar_y = 565
+    bar_x1 = 405
+    bar_x2 = 875
+    bar_y = 532
 
-    draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 10), 10, fill=(105, 105, 105))
+    draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 10), 10, fill=(95, 95, 95))
 
     progress = 0.40
     prog_x = int(bar_x1 + (bar_x2 - bar_x1) * progress)
@@ -207,27 +208,29 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     draw.rounded_rectangle((bar_x1, bar_y, prog_x, bar_y + 10), 10, fill=(226, 191, 123))
     draw.ellipse((prog_x - 11, bar_y - 7, prog_x + 11, bar_y + 15), fill="white")
 
-    draw.text((350, 603), "1:24", fill=(190, 190, 190), font=time_font)
-    draw.text((880, 603), duration, fill=(190, 190, 190), font=time_font)
+    draw.text((405, 570), "1:24", fill=(188, 188, 188), font=time_font)
+    draw.text((820, 570), duration, fill=(188, 188, 188), font=time_font)
 
     # =========================
-    # BUTTONS
+    # BUTTONS (AADAT STYLE)
     # =========================
-    draw.text((500, 655), "<<", fill="white", font=btn_font, anchor="mm")
+    draw.text((520, 640), "◀◀", fill="white", font=side_btn_font, anchor="mm")
+    draw.text((760, 640), "▶▶", fill="white", font=side_btn_font, anchor="mm")
 
-    pause_bg = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
+    pause_bg = Image.new("RGBA", (115, 115), (0, 0, 0, 0))
     pbd = ImageDraw.Draw(pause_bg)
-    pbd.rounded_rectangle((0, 0, 120, 120), 36, fill=(55, 55, 60, 255))
-    bg.paste(pause_bg, (580, 605), pause_bg)
+    pbd.rounded_rectangle((0, 0, 115, 115), 32, fill=(55, 55, 60, 255))
+    bg.paste(pause_bg, (582, 582), pause_bg)
 
-    draw.text((640, 663), "II", fill="white", font=pause_font, anchor="mm")
-    draw.text((780, 655), ">>", fill="white", font=btn_font, anchor="mm")
+    draw.text((640, 640), "II", fill="white", font=pause_font, anchor="mm")
 
-    # Save
+    # =========================
+    # SAVE
+    # =========================
     bg = bg.convert("RGB")
     bg.save(path, quality=98)
 
-    # cleanup
+    # Cleanup
     try:
         if thumb_file and os.path.exists(thumb_file):
             os.remove(thumb_file)
