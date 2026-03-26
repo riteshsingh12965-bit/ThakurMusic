@@ -38,7 +38,7 @@ def trim_text(text, font, max_width):
 
 
 # =========================
-# FETCH TITLE FROM YOUTUBE
+# FETCH YOUTUBE TITLE
 # =========================
 async def fetch_youtube_title(videoid: str):
     try:
@@ -56,7 +56,7 @@ async def fetch_youtube_title(videoid: str):
 
 
 # =========================
-# ICON DRAW FUNCTIONS
+# ICON DRAW
 # =========================
 def draw_prev(draw, x, y, color="white"):
     draw.polygon([(x+28, y), (x, y+20), (x+28, y+40)], fill=color)
@@ -103,15 +103,13 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     except:
         pass
 
-    # auto title fix
+    # Auto title
     if title.lower() in ["unknown song", "unknown", "none", ""]:
         yt_title = await fetch_youtube_title(videoid)
         if yt_title:
             title = yt_title
 
-    # -------------------------
     # Download thumbnail
-    # -------------------------
     thumb_url = f"https://img.youtube.com/vi/{videoid}/maxresdefault.jpg"
     try:
         async with aiohttp.ClientSession() as s:
@@ -130,9 +128,7 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     except:
         thumb_file = None
 
-    # -------------------------
     # Load image
-    # -------------------------
     try:
         if thumb_file and os.path.exists(thumb_file):
             original = Image.open(thumb_file).convert("RGB")
@@ -144,54 +140,56 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     original = ImageOps.fit(original, (1280, 720), method=Image.LANCZOS)
 
     # =========================
-    # BACKGROUND = SAME IMAGE BLUR
+    # BACKGROUND
     # =========================
-    bg = original.resize((1280, 720)).filter(ImageFilter.GaussianBlur(28))
-    bg = ImageEnhance.Brightness(bg).enhance(0.35)
-    bg = ImageEnhance.Color(bg).enhance(0.95)
+    bg = original.resize((1280, 720)).filter(ImageFilter.GaussianBlur(30))
+    bg = ImageEnhance.Brightness(bg).enhance(0.28)
+    bg = ImageEnhance.Color(bg).enhance(1.0)
     bg = bg.convert("RGBA")
 
-    dark = Image.new("RGBA", (1280, 720), (0, 0, 0, 95))
+    dark = Image.new("RGBA", (1280, 720), (0, 0, 0, 90))
     bg = Image.alpha_composite(bg, dark)
 
-    # =========================
-    # GLASS CARD (NO WHITE JHAT)
-    # =========================
-    card_x, card_y = 85, 150
-    card_w, card_h = 1110, 410
+    # soft center glow
+    glow = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse((250, 120, 1030, 650), fill=(255, 255, 255, 18))
+    glow = glow.filter(ImageFilter.GaussianBlur(120))
+    bg = Image.alpha_composite(bg, glow)
 
-    # shadow
+    # =========================
+    # GLASS CARD
+    # =========================
+    card_x, card_y = 80, 145
+    card_w, card_h = 1120, 420
+
     shadow = Image.new("RGBA", (card_w + 80, card_h + 80), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((0, 0, card_w + 80, card_h + 80), 42, fill=(0, 0, 0, 110))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(28))
-    bg.paste(shadow, (card_x - 40, card_y - 20), shadow)
+    sd.rounded_rectangle((0, 0, card_w + 80, card_h + 80), 42, fill=(0, 0, 0, 120))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(30))
+    bg.paste(shadow, (card_x - 40, card_y - 15), shadow)
 
-    # blurred card region
     card_crop = bg.crop((card_x, card_y, card_x + card_w, card_y + card_h))
     card_crop = card_crop.filter(ImageFilter.GaussianBlur(8))
 
-    # overlay
-    glass = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 18))
+    glass = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 16))
     card_crop = Image.alpha_composite(card_crop.convert("RGBA"), glass)
 
-    # mask
     mask = Image.new("L", (card_w, card_h), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, card_w, card_h), 34, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, card_w, card_h), 36, fill=255)
     bg.paste(card_crop, (card_x, card_y), mask)
 
-    # border
-    outline = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
-    od = ImageDraw.Draw(outline)
-    od.rounded_rectangle((0, 0, card_w - 1, card_h - 1), 34, outline=(255, 255, 255, 60), width=2)
-    bg.paste(outline, (card_x, card_y), outline)
+    border = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(border)
+    bd.rounded_rectangle((0, 0, card_w - 1, card_h - 1), 36, outline=(255, 255, 255, 52), width=2)
+    bg.paste(border, (card_x, card_y), border)
 
     draw = ImageDraw.Draw(bg)
 
     # =========================
-    # ROUND THUMB (BIG)
+    # ALBUM THUMB
     # =========================
-    thumb_size = 285
+    thumb_size = 265
     album = ImageOps.fit(original.convert("RGBA"), (thumb_size, thumb_size), method=Image.LANCZOS)
 
     circle_mask = Image.new("L", (thumb_size, thumb_size), 0)
@@ -202,67 +200,72 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     rd = ImageDraw.Draw(ring)
     rd.ellipse((0, 0, thumb_size + 17, thumb_size + 17), fill=(255, 255, 255, 255))
 
-    glow = Image.new("RGBA", (thumb_size + 80, thumb_size + 80), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    gd.ellipse((20, 20, thumb_size + 60, thumb_size + 60), fill=(255, 255, 255, 55))
-    glow = glow.filter(ImageFilter.GaussianBlur(18))
-    bg.paste(glow, (118, 192), glow)
+    album_glow = Image.new("RGBA", (thumb_size + 90, thumb_size + 90), (0, 0, 0, 0))
+    ag = ImageDraw.Draw(album_glow)
+    ag.ellipse((25, 25, thumb_size + 65, thumb_size + 65), fill=(255, 255, 255, 48))
+    album_glow = album_glow.filter(ImageFilter.GaussianBlur(22))
 
-    thumb_x = 145
-    thumb_y = 215
+    thumb_x = 140
+    thumb_y = 220
+    bg.paste(album_glow, (thumb_x - 35, thumb_y - 35), album_glow)
     bg.paste(ring, (thumb_x - 9, thumb_y - 9), ring)
     bg.paste(album, (thumb_x, thumb_y), album)
 
     # =========================
     # FONTS
     # =========================
-    title_font = load_font(36)
+    title_font = load_font(34)
     meta_font = load_font(22)
-    time_font = load_font(19)
+    time_font = load_font(18)
 
     # =========================
     # TEXT
     # =========================
     title = trim_text(title, title_font, 560)
 
-    draw.text((575, 245), title, fill="white", font=title_font)
-    draw.text((575, 315), f"YouTube | {views} views", fill=(220, 220, 220), font=meta_font)
+    text_x = 570
+    draw.text((text_x, 235), title, fill="white", font=title_font)
+    draw.text((text_x, 315), f"YouTube | {views} views", fill=(220, 220, 220), font=meta_font)
 
     # =========================
     # PROGRESS BAR
     # =========================
-    bar_x1 = 575
-    bar_x2 = 1125
-    bar_y = 375
+    bar_x1 = text_x
+    bar_x2 = 1120
+    bar_y = 390
 
     draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 8), 8, fill=(255, 255, 255))
     progress = 0.58
     prog_x = int(bar_x1 + (bar_x2 - bar_x1) * progress)
 
     draw.rounded_rectangle((bar_x1, bar_y, prog_x, bar_y + 8), 8, fill=(255, 0, 0))
-    draw.ellipse((prog_x - 10, bar_y - 9, prog_x + 10, bar_y + 11), fill=(255, 0, 0))
+    draw.ellipse((prog_x - 11, bar_y - 10, prog_x + 11, bar_y + 12), fill=(255, 0, 0))
 
-    draw.text((575, 410), "00:00", fill="white", font=time_font)
-    draw.text((1065, 410), duration, fill="white", font=time_font)
+    draw.text((bar_x1, 430), "00:00", fill="white", font=time_font)
+    draw.text((1065, 430), duration, fill="white", font=time_font)
 
     # =========================
     # CONTROLS
     # =========================
-    controls_y = 462
+    controls_y = 488
 
     draw_shuffle(draw, 585, controls_y, color="white")
-    draw_prev(draw, 725, controls_y + 2, color="white")
+    draw_prev(draw, 730, controls_y + 2, color="white")
 
-    # center play button
-    draw.ellipse((820, 438, 910, 528), fill=(255, 255, 255, 245))
-    draw_play(draw, 855, 463, color=(20, 20, 20))
+    # Play button premium
+    play_shadow = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
+    ps = ImageDraw.Draw(play_shadow)
+    ps.ellipse((15, 15, 105, 105), fill=(255, 255, 255, 50))
+    play_shadow = play_shadow.filter(ImageFilter.GaussianBlur(18))
+    bg.paste(play_shadow, (810, 435), play_shadow)
+
+    draw.ellipse((830, 455, 920, 545), fill=(255, 255, 255, 245))
+    draw_play(draw, 865, 480, color=(25, 25, 25))
 
     draw_next(draw, 980, controls_y + 2, color="white")
-    draw_repeat(draw, 1088, controls_y, color="white")
+    draw_repeat(draw, 1085, controls_y, color="white")
 
-    # =========================
-    # SAVE
-    # =========================
+    # Save
     bg = bg.convert("RGB")
     bg.save(path, quality=98)
 
