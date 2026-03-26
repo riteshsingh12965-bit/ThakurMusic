@@ -1,30 +1,29 @@
 import os
-import aiohttp
+import re
 import aiofiles
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps
+import aiohttp
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
+from unidecode import unidecode
+from py_yt import VideosSearch
+from VaishuMusic import app
+from config import YOUTUBE_IMG_URL
 
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FONT = os.path.abspath(os.path.join(BASE_DIR, "..", "assets", "font.ttf"))
 
 
 # =========================
 # HELPERS
 # =========================
+def changeImageSize(maxWidth, maxHeight, image):
+    return ImageOps.fit(image, (maxWidth, maxHeight), method=Image.LANCZOS)
+
+
 def safe_text(text, default="Unknown Song"):
     if text is None:
         return default
     text = str(text).strip()
     return text if text else default
-
-
-def load_font(size):
-    try:
-        return ImageFont.truetype(FONT, size)
-    except:
-        return ImageFont.load_default()
 
 
 def trim_text(text, font, max_width):
@@ -37,54 +36,33 @@ def trim_text(text, font, max_width):
         return text
 
 
-def parse_duration_to_seconds(duration: str):
-    try:
-        parts = [int(x) for x in str(duration).split(":")]
-        if len(parts) == 2:
-            return parts[0] * 60 + parts[1]
-        elif len(parts) == 3:
-            return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    except:
-        pass
-    return 240
-
-
-def format_time(seconds: int):
-    m = seconds // 60
-    s = seconds % 60
-    return f"{m:02d}:{s:02d}"
-
-
 def format_views(views):
     try:
-        v = str(views).replace(",", "").strip()
-        if not v or v == "0":
-            return "45M"
-        n = int(v)
-        if n >= 1_000_000_000:
-            return f"{round(n/1_000_000_000, 1)}B".replace(".0", "")
-        elif n >= 1_000_000:
-            return f"{round(n/1_000_000, 1)}M".replace(".0", "")
-        elif n >= 1_000:
-            return f"{round(n/1_000, 1)}K".replace(".0", "")
-        return str(n)
+        v = str(views).replace(",", "").replace("views", "").strip()
+        if not v:
+            return "0 views"
+        return f"{v} views" if "views" not in str(views).lower() else str(views)
     except:
-        return str(views) if views else "45M"
+        return "0 views"
 
 
-async def fetch_youtube_title(videoid: str):
-    try:
-        url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={videoid}&format=json"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=10) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    title = data.get("title")
-                    if title:
-                        return title.strip()
-    except:
-        pass
-    return None
+def crop_center_circle(img, output_size=260, border=12):
+    img = ImageOps.fit(img, (output_size - border * 2, output_size - border * 2), method=Image.LANCZOS)
+
+    mask = Image.new("L", (output_size - border * 2, output_size - border * 2), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, output_size - border * 2, output_size - border * 2), fill=255)
+
+    final_img = Image.new("RGBA", (output_size, output_size), (0, 0, 0, 0))
+
+    # white border ring
+    ring = Image.new("RGBA", (output_size, output_size), (0, 0, 0, 0))
+    rd = ImageDraw.Draw(ring)
+    rd.ellipse((0, 0, output_size - 1, output_size - 1), fill=(255, 255, 255, 255))
+    final_img.paste(ring, (0, 0), ring)
+
+    final_img.paste(img, (border, border), mask)
+    return final_img
 
 
 # =========================
@@ -95,7 +73,7 @@ def draw_prev(draw, x, y, color="white"):
     draw.rectangle((x+31, y, x+37, y+36), fill=color)
 
 
-def draw_play(draw, x, y, color=(30, 30, 30)):
+def draw_play(draw, x, y, color=(25, 25, 25)):
     draw.polygon([(x, y), (x, y+34), (x+28, y+17)], fill=color)
 
 
@@ -121,148 +99,154 @@ def draw_repeat(draw, x, y, color="white", width=4):
 # =========================
 # MAIN
 # =========================
-async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="0"):
-    title = safe_text(title, "Unknown Song")
-    duration = safe_text(duration, "4:00")
-    views = safe_text(views, "45M")
+async def get_thumb(videoid):
+    final_path = f"{CACHE_DIR}/{videoid}_v4.png"
 
-    path = f"{CACHE_DIR}/{videoid}.png"
-    thumb_file = f"{CACHE_DIR}/{videoid}.jpg"
+    if os.path.isfile(final_path):
+        return final_path
+
+    url = f"https://www.youtube.com/watch?v={videoid}"
+    results = VideosSearch(url, limit=1)
+
+    title = "Unknown Song"
+    duration = "0:00"
+    thumbnail = None
+    views = "0"
+    channel = "YouTube"
 
     try:
-        if os.path.exists(path):
-            os.remove(path)
+        data = await results.next()
+        result = data["result"][0]
+
+        title = safe_text(result.get("title"), "Unknown Song")
+        title = re.sub(r"\s+", " ", title).strip()
+
+        duration = safe_text(result.get("duration"), "0:00")
+
+        try:
+            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+        except:
+            thumbnail = None
+
+        try:
+            views = result["viewCount"]["short"]
+        except:
+            views = "0"
+
+        try:
+            channel = result["channel"]["name"]
+        except:
+            channel = "YouTube"
+
     except:
         pass
 
-    if title.lower() in ["unknown song", "unknown", "none", ""]:
-        yt_title = await fetch_youtube_title(videoid)
-        if yt_title:
-            title = yt_title
+    thumb_temp = f"{CACHE_DIR}/thumb_{videoid}.jpg"
 
-    # download thumbnail
-    thumb_url = f"https://img.youtube.com/vi/{videoid}/maxresdefault.jpg"
+    # -------------------------
+    # DOWNLOAD THUMB
+    # -------------------------
     try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get(thumb_url) as r:
-                if r.status == 200:
-                    async with aiofiles.open(thumb_file, "wb") as f:
-                        await f.write(await r.read())
-                else:
-                    thumb_url = f"https://img.youtube.com/vi/{videoid}/hqdefault.jpg"
-                    async with s.get(thumb_url) as r2:
-                        if r2.status == 200:
-                            async with aiofiles.open(thumb_file, "wb") as f:
-                                await f.write(await r2.read())
-                        else:
-                            thumb_file = None
+        if thumbnail:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(thumbnail) as resp:
+                    if resp.status == 200:
+                        async with aiofiles.open(thumb_temp, mode="wb") as f:
+                            await f.write(await resp.read())
     except:
-        thumb_file = None
+        pass
 
-    # load image
+    # -------------------------
+    # LOAD IMAGE
+    # -------------------------
     try:
-        if thumb_file and os.path.exists(thumb_file):
-            original = Image.open(thumb_file).convert("RGB")
-        else:
-            raise Exception("No thumb")
+        youtube = Image.open(thumb_temp).convert("RGB")
     except:
-        original = Image.new("RGB", (1280, 720), (30, 30, 30))
+        youtube = Image.new("RGB", (1280, 720), (30, 30, 30))
 
-    original = ImageOps.fit(original, (1280, 720), method=Image.LANCZOS)
-
-    total_seconds = parse_duration_to_seconds(duration)
-    progress = 0.58
-    current_seconds = int(total_seconds * progress)
-
-    current_time = format_time(current_seconds)
-    total_time = format_time(total_seconds)
-    pretty_views = format_views(views)
+    original = changeImageSize(1280, 720, youtube)
 
     # =========================
-    # BACKGROUND
+    # BACKGROUND = SAME SONG THUMB BLUR
     # =========================
-    bg = original.resize((1280, 720)).filter(ImageFilter.GaussianBlur(28))
-    bg = ImageEnhance.Brightness(bg).enhance(0.40)
-    bg = ImageEnhance.Color(bg).enhance(1.00)
-    bg = bg.convert("RGBA")
+    background = original.copy().filter(ImageFilter.GaussianBlur(28))
+    background = ImageEnhance.Brightness(background).enhance(0.38)
+    background = ImageEnhance.Color(background).enhance(1.0)
+    background = background.convert("RGBA")
 
-    dark = Image.new("RGBA", (1280, 720), (0, 0, 0, 110))
-    bg = Image.alpha_composite(bg, dark)
+    dark = Image.new("RGBA", (1280, 720), (0, 0, 0, 105))
+    background = Image.alpha_composite(background, dark)
 
-    # subtle focus glow
+    # soft center glow
     glow = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.ellipse((150, 120, 1130, 640), fill=(255, 255, 255, 14))
+    gd.ellipse((120, 100, 1160, 640), fill=(255, 255, 255, 16))
     glow = glow.filter(ImageFilter.GaussianBlur(90))
-    bg = Image.alpha_composite(bg, glow)
+    background = Image.alpha_composite(background, glow)
 
-    draw = ImageDraw.Draw(bg)
+    draw = ImageDraw.Draw(background)
 
     # =========================
     # GLASS CARD
     # =========================
-    card_x, card_y = 75, 165
-    card_w, card_h = 1060, 280
+    card_x, card_y = 70, 165
+    card_w, card_h = 1080, 290
 
     shadow = Image.new("RGBA", (card_w + 80, card_h + 80), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((0, 0, card_w + 80, card_h + 80), 32, fill=(0, 0, 0, 95))
+    sd.rounded_rectangle((0, 0, card_w + 80, card_h + 80), 34, fill=(0, 0, 0, 90))
     shadow = shadow.filter(ImageFilter.GaussianBlur(24))
-    bg.paste(shadow, (card_x - 40, card_y - 20), shadow)
+    background.paste(shadow, (card_x - 40, card_y - 20), shadow)
 
-    card_crop = bg.crop((card_x, card_y, card_x + card_w, card_y + card_h)).filter(ImageFilter.GaussianBlur(6))
-    glass = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 14))
+    card_crop = background.crop((card_x, card_y, card_x + card_w, card_y + card_h)).filter(ImageFilter.GaussianBlur(6))
+    glass = Image.new("RGBA", (card_w, card_h), (255, 255, 255, 12))
     card_crop = Image.alpha_composite(card_crop.convert("RGBA"), glass)
 
     mask = Image.new("L", (card_w, card_h), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, card_w, card_h), 28, fill=255)
-    bg.paste(card_crop, (card_x, card_y), mask)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, card_w, card_h), 30, fill=255)
+    background.paste(card_crop, (card_x, card_y), mask)
 
     border = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
     bd = ImageDraw.Draw(border)
-    bd.rounded_rectangle((0, 0, card_w - 1, card_h - 1), 28, outline=(255, 255, 255, 55), width=2)
-    bg.paste(border, (card_x, card_y), border)
-
-    # =========================
-    # ROUND THUMB
-    # =========================
-    thumb_size = 210
-    album = ImageOps.fit(original.convert("RGBA"), (thumb_size, thumb_size), method=Image.LANCZOS)
-
-    circle_mask = Image.new("L", (thumb_size, thumb_size), 0)
-    ImageDraw.Draw(circle_mask).ellipse((0, 0, thumb_size, thumb_size), fill=255)
-    album.putalpha(circle_mask)
-
-    ring = Image.new("RGBA", (thumb_size + 14, thumb_size + 14), (0, 0, 0, 0))
-    rd = ImageDraw.Draw(ring)
-    rd.ellipse((0, 0, thumb_size + 13, thumb_size + 13), fill=(255, 255, 255, 255))
-
-    glow_album = Image.new("RGBA", (thumb_size + 70, thumb_size + 70), (0, 0, 0, 0))
-    ag = ImageDraw.Draw(glow_album)
-    ag.ellipse((20, 20, thumb_size + 50, thumb_size + 50), fill=(255, 255, 255, 40))
-    glow_album = glow_album.filter(ImageFilter.GaussianBlur(20))
-
-    thumb_x = 115
-    thumb_y = 200
-    bg.paste(glow_album, (thumb_x - 28, thumb_y - 28), glow_album)
-    bg.paste(ring, (thumb_x - 7, thumb_y - 7), ring)
-    bg.paste(album, (thumb_x, thumb_y), album)
+    bd.rounded_rectangle((0, 0, card_w - 1, card_h - 1), 30, outline=(255, 255, 255, 55), width=2)
+    background.paste(border, (card_x, card_y), border)
 
     # =========================
     # FONTS
     # =========================
-    title_font = load_font(26)     # bold type feel
-    meta_font = load_font(18)
-    time_font = load_font(16)
+    try:
+        title_font = ImageFont.truetype("VaishuMusic/assets/font3.ttf", 28)
+        meta_font = ImageFont.truetype("VaishuMusic/assets/font2.ttf", 18)
+        time_font = ImageFont.truetype("VaishuMusic/assets/font2.ttf", 16)
+    except:
+        title_font = ImageFont.load_default()
+        meta_font = ImageFont.load_default()
+        time_font = ImageFont.load_default()
+
+    # =========================
+    # ROUND THUMB
+    # =========================
+    circle_thumbnail = crop_center_circle(youtube, output_size=230, border=10)
+
+    # soft glow around album
+    album_glow = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
+    ag = ImageDraw.Draw(album_glow)
+    ag.ellipse((25, 25, 275, 275), fill=(255, 255, 255, 35))
+    album_glow = album_glow.filter(ImageFilter.GaussianBlur(20))
+
+    thumb_x = 115
+    thumb_y = 195
+    background.paste(album_glow, (thumb_x - 35, thumb_y - 35), album_glow)
+    background.paste(circle_thumbnail, (thumb_x, thumb_y), circle_thumbnail)
 
     # =========================
     # TEXT
     # =========================
+    text_x = 530
     title = trim_text(title, title_font, 560)
 
-    text_x = 530
-    draw.text((text_x, 220), title, fill="white", font=title_font)
-    draw.text((text_x, 282), f"YouTube | {pretty_views} views", fill=(230, 230, 230), font=meta_font)
+    draw.text((text_x, 220), title, fill=(255, 255, 255), font=title_font)
+    draw.text((text_x, 282), f"{channel} | {format_views(views)}", fill=(235, 235, 235), font=meta_font)
 
     # =========================
     # PROGRESS BAR
@@ -271,22 +255,26 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     bar_x2 = 1040
     bar_y = 335
 
+    progress = 0.58
+    duration_clean = duration if duration and duration != "Unknown Mins" else "0:00"
+
     draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 7), 8, fill=(255, 255, 255))
     prog_x = int(bar_x1 + (bar_x2 - bar_x1) * progress)
     draw.rounded_rectangle((bar_x1, bar_y, prog_x, bar_y + 7), 8, fill=(255, 0, 0))
     draw.ellipse((prog_x - 9, bar_y - 8, prog_x + 9, bar_y + 10), fill=(255, 0, 0))
 
-    draw.text((bar_x1, 365), current_time, fill="white", font=time_font)
-    draw.text((1000, 365), total_time, fill="white", font=time_font)
+    draw.text((bar_x1, 365), "00:00", fill=(255, 255, 255), font=time_font)
+    draw.text((1000, 365), duration_clean, fill=(255, 255, 255), font=time_font)
 
     # =========================
-    # CONTROLS
+    # BUTTONS
     # =========================
     controls_y = 400
 
     draw_shuffle(draw, 540, controls_y, color="white")
     draw_prev(draw, 670, controls_y + 2, color="white")
 
+    # center play button
     draw.ellipse((780, 385, 860, 465), fill=(255, 255, 255, 245))
     draw_play(draw, 810, 408, color=(25, 25, 25))
 
@@ -296,13 +284,13 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     # =========================
     # SAVE
     # =========================
-    bg = bg.convert("RGB")
-    bg.save(path, quality=98)
+    background = background.convert("RGB")
+    background.save(final_path, quality=98)
 
     try:
-        if thumb_file and os.path.exists(thumb_file):
-            os.remove(thumb_file)
+        if os.path.exists(thumb_temp):
+            os.remove(thumb_temp)
     except:
         pass
 
-    return path
+    return final_path
