@@ -6,7 +6,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-FONT = os.path.join("ThakurMusic", "ShashankMusic", "assets", "font.ttf")
+# ✅ Dynamic font path (100% better)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT = os.path.join(BASE_DIR, "..", "assets", "font.ttf")
+FONT = os.path.abspath(FONT)
 
 
 def trim(text, font, max_w):
@@ -67,13 +70,14 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
     bg.paste(glow_border, (110, 135), glow_border)
     bg.paste(border, (110, 135), border)
 
-    # Fonts (BIGGER)
+    # ✅ Fonts (same look ke liye BIG)
     try:
-        badge_font = ImageFont.truetype(FONT, 30)
-        title_font = ImageFont.truetype(FONT, 62)
-        meta_font = ImageFont.truetype(FONT, 44)
-        small_font = ImageFont.truetype(FONT, 34)
-    except:
+        badge_font = ImageFont.truetype(FONT, 34)
+        title_font = ImageFont.truetype(FONT, 64)
+        meta_font = ImageFont.truetype(FONT, 48)
+        small_font = ImageFont.truetype(FONT, 38)
+    except Exception as e:
+        print("FONT LOAD ERROR:", e)
         badge_font = ImageFont.load_default()
         title_font = ImageFont.load_default()
         meta_font = ImageFont.load_default()
@@ -81,23 +85,23 @@ async def get_thumb(videoid: str, title="Unknown Song", duration="0:00", views="
 
     # NOW PLAYING badge
     draw.rounded_rectangle((620, 145, 960, 220), 35, fill=(255, 90, 70))
-    draw.text((695, 164), "NOW PLAYING", fill="black", font=badge_font)
+    draw.text((700, 165), "NOW PLAYING", fill="black", font=badge_font)
 
     # Title
-    title = trim(title, title_font, 540)
-    draw.text((620, 265), title, fill="white", font=title_font)
+    title = trim(title, title_font, 560)
+    draw.text((620, 255), title, fill="white", font=title_font)
 
     # Underline
     draw.line((620, 345, 1120, 345), fill=(255, 90, 70), width=5)
 
     # Meta section
     draw.text((620, 400), "Duration:", fill="white", font=meta_font)
-    draw.text((860, 400), duration, fill=(255, 110, 90), font=meta_font)
+    draw.text((865, 400), duration, fill=(255, 110, 90), font=meta_font)
 
-    draw.text((620, 490), "Views:", fill="white", font=meta_font)
-    draw.text((790, 490), views, fill=(255, 110, 90), font=meta_font)
+    draw.text((620, 485), "Views:", fill="white", font=meta_font)
+    draw.text((790, 485), views, fill=(255, 110, 90), font=meta_font)
 
-    # Progress bar (BIG)
+    # Progress bar
     bar_x = 620
     bar_y = 590
     bar_w = 500
