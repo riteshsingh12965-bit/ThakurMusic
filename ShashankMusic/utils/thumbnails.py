@@ -5,16 +5,13 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 from unidecode import unidecode
 from py_yt import VideosSearch
-from VaishuMusic import app
+from ShashankMusic import app
 from config import YOUTUBE_IMG_URL
 
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
-# =========================
-# HELPERS
-# =========================
 def changeImageSize(maxWidth, maxHeight, image):
     return ImageOps.fit(image, (maxWidth, maxHeight), method=Image.LANCZOS)
 
@@ -55,7 +52,6 @@ def crop_center_circle(img, output_size=260, border=12):
 
     final_img = Image.new("RGBA", (output_size, output_size), (0, 0, 0, 0))
 
-    # white border ring
     ring = Image.new("RGBA", (output_size, output_size), (0, 0, 0, 0))
     rd = ImageDraw.Draw(ring)
     rd.ellipse((0, 0, output_size - 1, output_size - 1), fill=(255, 255, 255, 255))
@@ -65,9 +61,6 @@ def crop_center_circle(img, output_size=260, border=12):
     return final_img
 
 
-# =========================
-# ICON DRAW
-# =========================
 def draw_prev(draw, x, y, color="white"):
     draw.polygon([(x+26, y), (x, y+18), (x+26, y+36)], fill=color)
     draw.rectangle((x+31, y, x+37, y+36), fill=color)
@@ -96,9 +89,6 @@ def draw_repeat(draw, x, y, color="white", width=4):
     draw.polygon([(x+8, y+24), (x-2, y+34), (x+10, y+36)], fill=color)
 
 
-# =========================
-# MAIN
-# =========================
 async def get_thumb(videoid):
     final_path = f"{CACHE_DIR}/{videoid}_v4.png"
 
@@ -143,9 +133,6 @@ async def get_thumb(videoid):
 
     thumb_temp = f"{CACHE_DIR}/thumb_{videoid}.jpg"
 
-    # -------------------------
-    # DOWNLOAD THUMB
-    # -------------------------
     try:
         if thumbnail:
             async with aiohttp.ClientSession() as session:
@@ -156,9 +143,6 @@ async def get_thumb(videoid):
     except:
         pass
 
-    # -------------------------
-    # LOAD IMAGE
-    # -------------------------
     try:
         youtube = Image.open(thumb_temp).convert("RGB")
     except:
@@ -166,9 +150,6 @@ async def get_thumb(videoid):
 
     original = changeImageSize(1280, 720, youtube)
 
-    # =========================
-    # BACKGROUND = SAME SONG THUMB BLUR
-    # =========================
     background = original.copy().filter(ImageFilter.GaussianBlur(28))
     background = ImageEnhance.Brightness(background).enhance(0.38)
     background = ImageEnhance.Color(background).enhance(1.0)
@@ -177,7 +158,6 @@ async def get_thumb(videoid):
     dark = Image.new("RGBA", (1280, 720), (0, 0, 0, 105))
     background = Image.alpha_composite(background, dark)
 
-    # soft center glow
     glow = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
     gd.ellipse((120, 100, 1160, 640), fill=(255, 255, 255, 16))
@@ -186,9 +166,6 @@ async def get_thumb(videoid):
 
     draw = ImageDraw.Draw(background)
 
-    # =========================
-    # GLASS CARD
-    # =========================
     card_x, card_y = 70, 165
     card_w, card_h = 1080, 290
 
@@ -211,24 +188,17 @@ async def get_thumb(videoid):
     bd.rounded_rectangle((0, 0, card_w - 1, card_h - 1), 30, outline=(255, 255, 255, 55), width=2)
     background.paste(border, (card_x, card_y), border)
 
-    # =========================
-    # FONTS
-    # =========================
     try:
-        title_font = ImageFont.truetype("VaishuMusic/assets/font3.ttf", 28)
-        meta_font = ImageFont.truetype("VaishuMusic/assets/font2.ttf", 18)
-        time_font = ImageFont.truetype("VaishuMusic/assets/font2.ttf", 16)
+        title_font = ImageFont.truetype("ShashankMusic/assets/font3.ttf", 28)
+        meta_font = ImageFont.truetype("ShashankMusic/assets/font2.ttf", 18)
+        time_font = ImageFont.truetype("ShashankMusic/assets/font2.ttf", 16)
     except:
         title_font = ImageFont.load_default()
         meta_font = ImageFont.load_default()
         time_font = ImageFont.load_default()
 
-    # =========================
-    # ROUND THUMB
-    # =========================
     circle_thumbnail = crop_center_circle(youtube, output_size=230, border=10)
 
-    # soft glow around album
     album_glow = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
     ag = ImageDraw.Draw(album_glow)
     ag.ellipse((25, 25, 275, 275), fill=(255, 255, 255, 35))
@@ -239,18 +209,12 @@ async def get_thumb(videoid):
     background.paste(album_glow, (thumb_x - 35, thumb_y - 35), album_glow)
     background.paste(circle_thumbnail, (thumb_x, thumb_y), circle_thumbnail)
 
-    # =========================
-    # TEXT
-    # =========================
     text_x = 530
     title = trim_text(title, title_font, 560)
 
     draw.text((text_x, 220), title, fill=(255, 255, 255), font=title_font)
     draw.text((text_x, 282), f"{channel} | {format_views(views)}", fill=(235, 235, 235), font=meta_font)
 
-    # =========================
-    # PROGRESS BAR
-    # =========================
     bar_x1 = text_x
     bar_x2 = 1040
     bar_y = 335
@@ -266,24 +230,17 @@ async def get_thumb(videoid):
     draw.text((bar_x1, 365), "00:00", fill=(255, 255, 255), font=time_font)
     draw.text((1000, 365), duration_clean, fill=(255, 255, 255), font=time_font)
 
-    # =========================
-    # BUTTONS
-    # =========================
     controls_y = 400
 
     draw_shuffle(draw, 540, controls_y, color="white")
     draw_prev(draw, 670, controls_y + 2, color="white")
 
-    # center play button
     draw.ellipse((780, 385, 860, 465), fill=(255, 255, 255, 245))
     draw_play(draw, 810, 408, color=(25, 25, 25))
 
     draw_next(draw, 925, controls_y + 2, color="white")
     draw_repeat(draw, 1035, controls_y, color="white")
 
-    # =========================
-    # SAVE
-    # =========================
     background = background.convert("RGB")
     background.save(final_path, quality=98)
 
