@@ -4,10 +4,12 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from youtubesearchpython.__future__ import VideosSearch
 from config import YOUTUBE_IMG_URL
-from ShashankMusic import app   # ✅ yaha repo/package ka sahi naam
+from ShashankMusic import app
 
 CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+FONT_PATH = os.path.join("ThakurMusic", "ShashankMusic", "assets", "font.ttf")
 
 
 def trim(text, font, max_w):
@@ -27,7 +29,7 @@ async def gen_thumb(videoid: str, player_username=None):
     if os.path.exists(path) and os.path.getsize(path) > 0:
         return path
 
-    # 🔍 YT FETCH
+    # 🔍 YOUTUBE FETCH
     try:
         results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
         res = await results.next()
@@ -47,7 +49,7 @@ async def gen_thumb(videoid: str, player_username=None):
 
     thumb_path = f"{CACHE_DIR}/{videoid}.png"
 
-    # ⬇ DOWNLOAD
+    # ⬇ DOWNLOAD THUMB
     try:
         async with aiohttp.ClientSession() as s:
             async with s.get(thumb_url) as r:
@@ -59,7 +61,7 @@ async def gen_thumb(videoid: str, player_username=None):
     except:
         thumb_path = None
 
-    # 🖤 BLACK BG
+    # 🖤 BASE BG
     bg = Image.new("RGB", (1280, 720), (0, 0, 0))
 
     # 🔥 PREMIUM GLOW BACKGROUND
@@ -71,7 +73,7 @@ async def gen_thumb(videoid: str, player_username=None):
 
     draw = ImageDraw.Draw(bg)
 
-    # 🖼 THUMB
+    # 🖼 THUMB IMAGE
     try:
         thumb = Image.open(thumb_path).resize((420, 420)).convert("RGBA")
     except:
@@ -103,9 +105,9 @@ async def gen_thumb(videoid: str, player_username=None):
 
     # 🅵🅾🅽🆃
     try:
-        title_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 44)
-        meta_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 30)
-        small_font = ImageFont.truetype("ShashankMusic/assets/font.ttf", 26)
+        title_font = ImageFont.truetype(FONT_PATH, 44)
+        meta_font = ImageFont.truetype(FONT_PATH, 30)
+        small_font = ImageFont.truetype(FONT_PATH, 26)
     except:
         title_font = meta_font = small_font = ImageFont.load_default()
 
@@ -125,7 +127,7 @@ async def gen_thumb(videoid: str, player_username=None):
     draw.text((600, 370), f"Views: {views}", fill=(255, 140, 90), font=meta_font)
     draw.text((600, 410), f"Player: @{player_username}", fill=(255, 140, 90), font=meta_font)
 
-    # 🎚 BAR
+    # 🎚 PROGRESS BAR
     bar_x, bar_y = 600, 480
     bar_w = 500
 
