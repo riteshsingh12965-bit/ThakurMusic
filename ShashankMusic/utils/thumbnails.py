@@ -21,7 +21,7 @@ def trim(text, font, max_w):
         return text
 
 
-async def gen_thumb(videoid: str, player_username=None):
+async def get_thumb(videoid: str, player_username=None):
     if player_username is None:
         player_username = getattr(app, "username", "MusicBot")
 
