@@ -1,222 +1,130 @@
 import os
 import re
-import aiofiles
 import aiohttp
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
-from py_yt import VideosSearch
+import aiofiles
+from SONALI import app
 from config import YOUTUBE_IMG_URL
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from py_yt import VideosSearch
 
-# =========================
-# CONFIG
-# =========================
-CACHE_DIR = "cache"
-os.makedirs(CACHE_DIR, exist_ok=True)
+def clear(text):
+    return re.sub("\s+", " ", text).strip()
 
-WIDTH, HEIGHT = 1280, 720
+def changeImageSize(maxWidth, maxHeight, image):
+    widthRatio = maxWidth / image.size[0]
+    heightRatio = maxHeight / image.size[1]
+    newWidth = int(image.size[0] * min(widthRatio, heightRatio))
+    newHeight = int(image.size[1] * min(widthRatio, heightRatio))
+    return image.resize((newWidth, newHeight))
 
-THUMB_X = 105
-THUMB_Y = 140
-THUMB_W = 450
-THUMB_H = 450
-THUMB_RADIUS = 35
-BORDER_WIDTH = 10
+async def get_thumb(videoid):
+    if os.path.isfile(f"cache/{videoid}.png"):
+        return f"cache/{videoid}.png"
 
-BADGE_X = 620
-BADGE_Y = 125
-
-TITLE_X = 620
-TITLE_Y = 215
-
-META_X = 620
-META_Y = 370
-
-BAR_X = 620
-BAR_Y = 535
-BAR_TOTAL = 500
-BAR_RED = 250
-
-FOOTER_X = 910
-FOOTER_Y = 650
-
-MAX_TITLE_WIDTH = 530
-
-# =========================
-# HELPERS
-# =========================
-def safe_text(text):
-    if not text:
-        return "Unknown"
-    return str(text).encode("ascii", "ignore").decode("ascii").strip() or "Unknown"
-
-def trim_to_width(text, font, max_w):
-    text = safe_text(text)
-    ellipsis = "..."
+    url = f"https://www.youtube.com/watch?v={videoid}"
     try:
-        if draw_text_width(text, font) <= max_w:
-            return text
-        for i in range(len(text), 0, -1):
-            test = text[:i] + ellipsis
-            if draw_text_width(test, font) <= max_w:
-                return test
-    except Exception:
-        return text[:35] + "..." if len(text) > 35 else text
-    return text
+        results = VideosSearch(url, limit=1)
+        for result in (await results.next())["result"]:
+            try:
+                title = result["title"]
+                title = re.sub("\W+", " ", title)
+                title = title.title()
+            except:
+                title = "Unsupported Title"
+            try:
+                duration = result["duration"]
+            except:
+                duration = "Unknown Mins"
+            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+            try:
+                views = result["viewCount"]["short"]
+            except:
+                views = "Unknown Views"
+            try:
+                channel = result["channel"]["name"]
+            except:
+                channel = "Unknown Channel"
 
-def draw_text_width(text, font):
-    try:
-        return font.getbbox(text)[2] - font.getbbox(text)[0]
-    except:
-        return len(text) * 15  # fallback approx
-
-# =========================
-# MAIN FUNCTION
-# =========================
-async def get_thumb(videoid: str) -> str:
-    cache_path = os.path.join(CACHE_DIR, f"{videoid}_premium.png")
-    thumb_path = os.path.join(CACHE_DIR, f"{videoid}_thumb.jpg")
-
-    if os.path.exists(cache_path):
-        return cache_path
-
-    # -------------------------
-    # FETCH YOUTUBE DATA
-    # -------------------------
-    try:
-        results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
-        results_data = await results.next()
-        result_items = results_data.get("result", [])
-
-        if not result_items:
-            raise Exception("No video data found")
-
-        data = result_items[0]
-
-        title = safe_text(data.get("title", "Unknown Song"))
-        thumbnail = data.get("thumbnails", [{}])[0].get("url", f"https://i.ytimg.com/vi/{videoid}/hqdefault.jpg")
-        duration = safe_text(data.get("duration", "4:00"))
-        views = safe_text(data.get("viewCount", {}).get("short", "Unknown Views"))
-
-    except Exception:
-        title = "Unknown Song"
-        thumbnail = f"https://i.ytimg.com/vi/{videoid}/hqdefault.jpg"
-        duration = "4:00"
-        views = "Unknown Views"
-
-    # -------------------------
-    # DOWNLOAD THUMBNAIL
-    # -------------------------
-    try:
+        
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:
                 if resp.status == 200:
-                    async with aiofiles.open(thumb_path, "wb") as f:
-                        await f.write(await resp.read())
-                else:
-                    raise Exception("Thumbnail download failed")
-    except Exception:
-        return None
+                    f = await aiofiles.open(f"cache/thumb{videoid}.png", mode="wb")
+                    await f.write(await resp.read())
+                    await f.close()
 
-    # -------------------------
-    # OPEN IMAGE SAFELY
-    # -------------------------
-    try:
-        base = Image.open(thumb_path).convert("RGBA").resize((WIDTH, HEIGHT))
-    except Exception:
-        return None
+        youtube = Image.open(f"cache/thumb{videoid}.png")
+        youtube = youtube.convert("RGBA")
 
-    bg = ImageEnhance.Brightness(base.filter(ImageFilter.GaussianBlur(18))).enhance(0.30)
-    draw = ImageDraw.Draw(bg)
+        
+        background = youtube.resize((1280, 720)).filter(ImageFilter.GaussianBlur(radius=10))
+        enhancer = ImageEnhance.Brightness(background)
+        background = enhancer.enhance(0.6)  
 
-    # -------------------------
-    # LOAD FONTS
-    # -------------------------
-    try:
-        badge_font = ImageFont.truetype("Shashank/assets/assets/font2.ttf", 30)
-        title_font = ImageFont.truetype("Shashank/assets/assets/font.ttf", 54)
-        regular_font = ImageFont.truetype("Shashank/assets/assets/font2.ttf", 38)
-        small_font = ImageFont.truetype("Shashank/assets/assets/font2.ttf", 28)
-        footer_font = ImageFont.truetype("Shashank/assets/assets/font2.ttf", 22)
-    except Exception:
-        badge_font = title_font = regular_font = small_font = footer_font = ImageFont.load_default()
+        draw = ImageDraw.Draw(background)
 
-    # -------------------------
-    # LEFT THUMB
-    # -------------------------
-    try:
-        thumb = Image.open(thumb_path).convert("RGBA").resize((THUMB_W, THUMB_H))
-    except Exception:
-        thumb = base.resize((THUMB_W, THUMB_H))
+    
+        center_thumb_size = (942, 422)
+        center_thumb = youtube.resize(center_thumb_size)
 
-    mask = Image.new("L", (THUMB_W, THUMB_H), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, THUMB_W, THUMB_H), THUMB_RADIUS, fill=255)
+        border_size = 14
+        bordered_center_thumb = Image.new("RGBA", (center_thumb_size[0] + 2 * border_size, center_thumb_size[1] + 2 * border_size), (255, 255, 255))
+        bordered_center_thumb.paste(center_thumb, (border_size, border_size))
 
-    border_img = Image.new("RGBA", (THUMB_W + BORDER_WIDTH*2, THUMB_H + BORDER_WIDTH*2), (0, 0, 0, 0))
-    border_draw = ImageDraw.Draw(border_img)
-    border_draw.rounded_rectangle(
-        (0, 0, THUMB_W + BORDER_WIDTH*2 - 1, THUMB_H + BORDER_WIDTH*2 - 1),
-        THUMB_RADIUS + 8,
-        outline=(255, 59, 59, 255),
-        width=BORDER_WIDTH
-    )
+        
+        pos_x = (1280 - bordered_center_thumb.size[0]) // 2
+        pos_y = ((720 - bordered_center_thumb.size[1]) // 2) - 30  
 
-    bg.paste(border_img, (THUMB_X - BORDER_WIDTH, THUMB_Y - BORDER_WIDTH), border_img)
-    bg.paste(thumb, (THUMB_X, THUMB_Y), mask)
+        background.paste(bordered_center_thumb, (pos_x, pos_y))
 
-    # -------------------------
-    # NOW PLAYING BADGE
-    # -------------------------
-    badge_w, badge_h = 230, 65
-    badge = Image.new("RGBA", (badge_w, badge_h), (0, 0, 0, 0))
-    badge_draw = ImageDraw.Draw(badge)
-    badge_draw.rounded_rectangle((0, 0, badge_w, badge_h), 32, fill=(255, 59, 59, 255))
-    bg.paste(badge, (BADGE_X, BADGE_Y), badge)
+        
+        arial = ImageFont.truetype("SONALI/assets/font2.ttf", 30)
+        font = ImageFont.truetype("SONALI/assets/font.ttf", 30)
+        bold_font = ImageFont.truetype("SONALI/assets/font.ttf", 33)
 
-    draw.text((BADGE_X + 38, BADGE_Y + 15), "NOW PLAYING", fill="white", font=badge_font)
+    
+        text_size = draw.textsize("@PurviBots   ", font=font)
+        draw.text((1280 - text_size[0] - 10, 10), "@PurviBots   ", fill="yellow", font=font)
 
-    # -------------------------
-    # TITLE
-    # -------------------------
-    title = trim_to_width(title, title_font, MAX_TITLE_WIDTH)
-    draw.text((TITLE_X, TITLE_Y), title, fill="white", font=title_font)
+    
+        draw.text(
+            (55, 580),  
+            f"{channel} | {views[:23]}",
+            (255, 255, 255),
+            font=arial,
+        )
 
-    title_line_width = min(draw_text_width(title, title_font), 430)
-    draw.line((TITLE_X, TITLE_Y + 78, TITLE_X + title_line_width, TITLE_Y + 78), fill=(255, 59, 59), width=5)
+        
+        draw.text(
+            (57, 620), 
+            title,
+            (255, 255, 255),
+            font=font,
+        )
 
-    # -------------------------
-    # META
-    # -------------------------
-    draw.text((META_X, META_Y), f"Duration: {duration}", fill="white", font=regular_font)
-    draw.text((META_X, META_Y + 58), f"Views: {views}", fill=(255, 90, 90), font=regular_font)
-    draw.text((META_X, META_Y + 116), "Player: @sunumusicbot", fill=(255, 90, 90), font=regular_font)
+        
+        draw.text((55, 655), "00:00", fill="white", font=bold_font)
 
-    # -------------------------
-    # PROGRESS BAR
-    # -------------------------
-    draw.line((BAR_X, BAR_Y, BAR_X + BAR_TOTAL, BAR_Y), fill=(240, 240, 240), width=16)
-    draw.line((BAR_X, BAR_Y, BAR_X + BAR_RED, BAR_Y), fill=(255, 59, 59), width=16)
+        
+        start_x = 150
+        end_x = 1130
+        line_y = 670
+        draw.line([(start_x, line_y), (end_x, line_y)], fill="white", width=4)
 
-    knob_x = BAR_X + BAR_RED
-    draw.ellipse((knob_x - 16, BAR_Y - 16, knob_x + 16, BAR_Y + 16), fill="white")
+        
+        duration_text_size = draw.textsize(duration, font=bold_font)
+        draw.text((end_x + 10, 655), duration, fill="white", font=bold_font)
 
-    draw.text((BAR_X, BAR_Y + 28), "00:00", fill="white", font=small_font)
-    draw.text((BAR_X + BAR_TOTAL - 70, BAR_Y + 28), duration, fill="white", font=small_font)
+        
+        try:
+            os.remove(f"cache/thumb{videoid}.png")
+        except:
+            pass
 
-    # -------------------------
-    # FOOTER
-    # -------------------------
-    draw.text((FOOTER_X, FOOTER_Y), "Powered by Mr Thakur", fill=(190, 190, 190), font=footer_font)
+        background.save(f"cache/{videoid}.png")
+        return f"cache/{videoid}.png"
 
-    # -------------------------
-    # SAVE
-    # -------------------------
-    try:
-        bg.save(cache_path)
-    except Exception:
-        return None
-
-    try:
-        os.remove(thumb_path)
-    except:
-        pass
-
-    return cache_path
+    except Exception as e:
+        print(e)
+        return YOUTUBE_IMG_URL
+        
