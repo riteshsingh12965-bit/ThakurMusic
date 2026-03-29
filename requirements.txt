@@ -41,8 +41,10 @@ pyrofork
 py-tgcalls==0.9.7
 pyyaml
 requests
+spotipy==2.24.0
 tgcrypto
 unidecode
 wget
 youtube-search-python
 yt-dlp
+speedtest-cli
