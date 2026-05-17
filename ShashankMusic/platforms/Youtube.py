@@ -6,9 +6,9 @@ import yt_dlp
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message
 from py_yt import VideosSearch, Playlist
-from ThakurxMusic.utils.formatters import time_to_seconds
+from ShashankMusic.utils.formatters import time_to_seconds
 import aiohttp
-from ThakurxMusic import LOGGER
+from ShashankMusic import LOGGER
 
 API_URL = "https://shrutibots.site"
 DOWNLOAD_DIR = "downloads"
